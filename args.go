@@ -38,14 +38,3 @@ func WithConvFunc(fs ...interface{}) Arg {
 		return nil
 	}
 }
-
-// withNamedReflectValues sets the map of known values directly. We use
-// this internally for calling converters. This is not exported since its
-// not a public API we want to support currently and it can be simulated
-// with repeated calls to Named.
-func withNamedReflectValues(v map[string]reflect.Value) Arg {
-	return func(a *argBuilder) error {
-		a.named = v
-		return nil
-	}
-}

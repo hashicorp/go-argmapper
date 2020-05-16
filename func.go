@@ -108,11 +108,6 @@ func (f *Func) Call(opts ...Arg) Result {
 	// Let's walk the graph and print out our paths
 	println(fmt.Sprintf("%s", g.Reverse().KahnSort()))
 	for _, current := range g.Reverse().KahnSort() {
-		// If we arrived at our function, we've satisfied our inputs.
-		if current == vertex {
-			break
-		}
-
 		// Depending on the type of vertex, we execute
 		switch v := current.(type) {
 		case valueVertex:
@@ -125,7 +120,7 @@ func (f *Func) Call(opts ...Arg) Result {
 			// Call the function. We don't need to specify any converters
 			// here, we only specify our "inValues" because the graph
 			// should guarantee that we have exactly what we need.
-			result := v.Conv.Call(withNamedReflectValues(inValues))
+			result := v.Conv.call(inValues)
 			if err := result.Err(); err != nil {
 				return Result{buildErr: err}
 			}
@@ -133,16 +128,26 @@ func (f *Func) Call(opts ...Arg) Result {
 			// Get the result
 			v.Conv.outputValues(result, inValues)
 
+		case funcVertex:
+			return v.Func.call(inValues)
+
 		default:
 			panic(fmt.Sprintf("unknown vertex: %v", current))
 		}
 	}
 
+	panic("Call graph never arrived at function")
+}
+
+// call -- the unexported version of Call -- calls the function directly
+// with the given named arguments. This skips the whole graph creation
+// step by requiring args satisfy all required arguments.
+func (f *Func) call(args map[string]reflect.Value) Result {
 	// Initialize the struct we'll be populating
 	var buildErr error
 	structVal := f.input.New()
 	for k, _ := range f.input.fields {
-		v, ok := inValues[k]
+		v, ok := args[k]
 		if !ok {
 			buildErr = multierror.Append(buildErr, fmt.Errorf(
 				"argument cannot be satisfied: %s", k))
@@ -152,13 +157,13 @@ func (f *Func) Call(opts ...Arg) Result {
 		structVal.Field(k).Set(v)
 	}
 
+	// If there was an error setting up the struct, then report that.
 	if buildErr != nil {
 		return Result{buildErr: buildErr}
 	}
 
 	// Call our function
 	out := f.fn.Call([]reflect.Value{structVal.Value()})
-
 	return Result{out: out}
 }
 
