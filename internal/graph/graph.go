@@ -53,6 +53,45 @@ func (g *Graph) RemoveEdge(v1, v2 Vertex) {
 	delete(g.adjacencyIn[h2], h1)
 }
 
+func (g *Graph) OutEdges(v Vertex) []Vertex {
+	edges := g.adjacencyOut[hashcode(v)]
+	if len(edges) == 0 {
+		return nil
+	}
+
+	result := make([]Vertex, 0, len(edges))
+	for h := range edges {
+		result = append(result, g.hash[h])
+	}
+
+	return result
+}
+
+func (g *Graph) InEdges(v Vertex) []Vertex {
+	edges := g.adjacencyIn[hashcode(v)]
+	if len(edges) == 0 {
+		return nil
+	}
+
+	result := make([]Vertex, 0, len(edges))
+	for h := range edges {
+		result = append(result, g.hash[h])
+	}
+
+	return result
+}
+
+// Reverse reverses the graph but _does not make a copy_. Any changes to
+// this graph will impact the original Graph. You must call Copy on the
+// result if you want to have a copy.
+func (g *Graph) Reverse() *Graph {
+	return &Graph{
+		adjacencyOut: g.adjacencyIn,
+		adjacencyIn:  g.adjacencyOut,
+		hash:         g.hash,
+	}
+}
+
 // Copy copies the graph. In the copy, any added or removed edges do not
 // affect the original graph. The vertices themselves are not deep copied.
 func (g *Graph) Copy() *Graph {

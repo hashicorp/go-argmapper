@@ -10,6 +10,11 @@ type VertexHashable interface {
 	Hashcode() interface{}
 }
 
+// VertexID returns the unique ID for a vertex.
+func VertexID(v Vertex) interface{} {
+	return hashcode(v)
+}
+
 // hashcode returns the hashcode for a Vertex.
 func hashcode(v interface{}) interface{} {
 	if h, ok := v.(VertexHashable); ok {

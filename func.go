@@ -6,6 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
@@ -75,16 +76,30 @@ func (f *Func) Call(opts ...Arg) Result {
 	// Next, we add the values that we know about. These may overlap with
 	// inputs we require but the graph ensures that the same vertices are
 	// added only once.
-	inputs := make([]graph.Vertex, 0, len(builder.named))
+	inputs := map[interface{}]struct{}{}
 	for k, v := range builder.named {
 		input := g.Add(valueVertex{
 			Name: k,
 			Type: v.Type(),
 		})
 
-		inputs = append(inputs, input)
+		inputs[graph.VertexID(input)] = struct{}{}
 		vertexValues[input] = v
 	}
+
+	// Find all the paths to our function
+	visited := map[interface{}]struct{}{}
+	g.Reverse().DFS(vertex, func(v graph.Vertex, next func() error) error {
+		// Mark this as visited
+		visited[graph.VertexID(v)] = struct{}{}
+
+		// If we arrived at an input we have, then we don't go deeper.
+		if _, ok := inputs[graph.VertexID(v)]; ok {
+			return nil
+		}
+
+		return next()
+	})
 
 	// Let's walk the graph and print out our paths
 	println(fmt.Sprintf("%s", g.KahnSort()))
@@ -98,14 +113,28 @@ func (f *Func) Call(opts ...Arg) Result {
 		switch v := current.(type) {
 		case valueVertex:
 			// We have a value.
-			inValues[v.Name] = vertexValues[v]
+			if val, ok := vertexValues[v]; ok {
+				inValues[v.Name] = val
+			}
 		}
 	}
 
 	// Initialize the struct we'll be populating
+	var buildErr error
 	structVal := f.arg.New()
 	for k, _ := range f.arg.fields {
-		structVal.Field(k).Set(inValues[k])
+		v, ok := inValues[k]
+		if !ok {
+			buildErr = multierror.Append(buildErr, fmt.Errorf(
+				"argument cannot be satisfied: %s", k))
+			continue
+		}
+
+		structVal.Field(k).Set(v)
+	}
+
+	if buildErr != nil {
+		return Result{buildErr: buildErr}
 	}
 
 	// Call our function
