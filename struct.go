@@ -63,6 +63,9 @@ func newStructType(typ reflect.Type) (*structType, error) {
 			}
 		}
 
+		// Name is always lowercase
+		name = strings.ToLower(name)
+
 		// Record it
 		result.fields[name] = &structField{
 			Index: i,
@@ -90,6 +93,6 @@ func (v *structValue) Value() reflect.Value {
 	return v.value
 }
 
-func (v *structValue) Set(n string, val reflect.Value) {
-	v.value.Field(v.typ.fields[n].Index).Set(val)
+func (v *structValue) Field(n string) reflect.Value {
+	return v.value.Field(v.typ.fields[n].Index)
 }

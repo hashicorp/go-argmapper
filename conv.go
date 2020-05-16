@@ -3,6 +3,8 @@ package argmapper
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/mitchellh/go-argmapper/internal/dag"
 )
 
 // Conv represents a converter function that knows how to convert
@@ -39,8 +41,7 @@ import (
 // to the user. In all cases, the errors are made available in the Result type
 // for logging.
 type Conv struct {
-	inputs  map[string]reflect.Type
-	outputs map[string]reflect.Type
+	input, output *structType
 }
 
 // NewConv constructs a new converter. See the docs on Conv for more info.
@@ -64,11 +65,84 @@ func NewConv(f interface{}) (*Conv, error) {
 		return nil, fmt.Errorf("function must take one struct arg")
 	}
 
-	// We expect one or two results. Either way the first result must
-	// be a struct.
-	if ft.NumOut() == 0 || ft.NumOut() > 2 {
+	// Validate output types.
+	if ft.NumOut() != 1 {
 		return nil, fmt.Errorf("function must return one or two results")
 	}
 
-	return nil, nil
+	out := ft.Out(0)
+	if out.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("first return value must be a struct or *struct")
+	}
+
+	input, err := newStructType(typ)
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := newStructType(out)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Conv{
+		input:  input,
+		output: output,
+	}, nil
 }
+
+// ConvSet is a set of converters.
+type ConvSet []*Conv
+
+func (cs ConvSet) graph(g *dag.Graph) {
+	// Go through all our convs and create the vertices for our inputs and outputs
+	for _, conv := range cs {
+		vertex := g.Add(convVertex{
+			Conv: conv,
+		})
+
+		// Add all our inputs and add an edge from the func to the input
+		for k, f := range conv.input.fields {
+			g.Connect(dag.BasicEdge(vertex, g.Add(valueVertex{
+				Name: k,
+				Type: f.Type,
+			})))
+		}
+
+		// Add all our outputs
+		for k, f := range conv.input.fields {
+			g.Connect(dag.BasicEdge(g.Add(valueVertex{
+				Name: k,
+				Type: f.Type,
+			}), vertex))
+		}
+	}
+}
+
+type valueVertex struct {
+	Name string
+	Type reflect.Type
+}
+
+func (v *valueVertex) Hashcode() interface{} {
+	return fmt.Sprintf("%s/%s", v.Name, v.Type.String())
+}
+
+type convVertex struct {
+	Conv *Conv
+}
+
+func (v *convVertex) Hashcode() interface{} { return v.Conv }
+
+type funcVertex struct {
+	Func *Func
+}
+
+func (v *funcVertex) Hashcode() interface{} { return v.Func }
+func (v funcVertex) String() string         { return v.Func.fn.String() }
+
+var (
+	_ dag.Hashable = (*convVertex)(nil)
+	_ dag.Hashable = (*funcVertex)(nil)
+	_ dag.Hashable = (*valueVertex)(nil)
+)

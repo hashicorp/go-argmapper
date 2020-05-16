@@ -86,13 +86,12 @@ func TestFunc(t *testing.T) {
 				},
 				[]Arg{
 					Named("a", 12),
-					ConverterFunc(func(v int) string { return strconv.Itoa(v) }),
-					ConverterFunc(func(struct {
+					WithConvFunc(func(s struct {
 						A int
-					}) *struct {
+					}) struct {
 						A string
 					} {
-						return nil
+						return struct{ A string }{strconv.Itoa(s.A)}
 					}),
 				},
 				[]interface{}{"12!"},

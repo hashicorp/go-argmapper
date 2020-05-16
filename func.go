@@ -6,7 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/hashicorp/go-multierror"
+	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
 type Func struct {
@@ -48,34 +48,64 @@ func NewFunc(f interface{}) (*Func, error) {
 func (f *Func) Call(opts ...Arg) Result {
 	// Build up our args
 	builder := &argBuilder{
-		named: make(map[string]interface{}),
+		named: make(map[string]reflect.Value),
 	}
 	for _, opt := range opts {
 		opt(builder)
 	}
 
-	// resultErr builds up an error we set on Result prior to the actual
-	// function call if there are errors preparing the arguments.
-	var resultErr error
+	// Start building our graph. The first step is to add our own vertex.
+	// Then we go through all the named inputs we have and add them to the
+	// graph, with an edge from our function to the inputs we require.
+	var g graph.Graph
+	vertex := g.Add(funcVertex{
+		Func: f,
+	})
+	for k, f := range f.arg.fields {
+		g.AddEdge(g.Add(valueVertex{
+			Name: k,
+			Type: f.Type,
+		}), vertex)
+	}
+
+	// Values is the built up list of values we know about
+	vertexValues := map[graph.Vertex]reflect.Value{}
+	inValues := map[string]reflect.Value{}
+
+	// Next, we add the values that we know about. These may overlap with
+	// inputs we require but the graph ensures that the same vertices are
+	// added only once.
+	inputs := make([]graph.Vertex, 0, len(builder.named))
+	for k, v := range builder.named {
+		input := g.Add(valueVertex{
+			Name: k,
+			Type: v.Type(),
+		})
+
+		inputs = append(inputs, input)
+		vertexValues[input] = v
+	}
+
+	// Let's walk the graph and print out our paths
+	println(fmt.Sprintf("%s", g.KahnSort()))
+	for _, current := range g.KahnSort() {
+		// If we arrived at our function, we've satisfied our inputs.
+		if current == vertex {
+			break
+		}
+
+		// Depending on the type of vertex, we execute
+		switch v := current.(type) {
+		case valueVertex:
+			// We have a value.
+			inValues[v.Name] = vertexValues[v]
+		}
+	}
 
 	// Initialize the struct we'll be populating
 	structVal := f.arg.New()
-
-	// We want to populate our args to instantiate our struct
 	for k, _ := range f.arg.fields {
-		value, ok := builder.named[firstToLower(k)]
-		if !ok {
-			resultErr = multierror.Append(resultErr, fmt.Errorf(
-				"argument cannot be satisfied: %s", k))
-			continue
-		}
-
-		structVal.Set(k, reflect.ValueOf(value))
-	}
-
-	// If we have an error, then we don't even call we just set it and return
-	if resultErr != nil {
-		return Result{buildErr: resultErr}
+		structVal.Field(k).Set(inValues[k])
 	}
 
 	// Call our function
