@@ -57,6 +57,48 @@ func TestFunc(t *testing.T) {
 			[]interface{}{12},
 			"",
 		},
+
+		{
+			"renamed field",
+			func(in struct {
+				A int `argmapper:"C"`
+				B int
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				Named("b", 24),
+				Named("c", 12),
+			},
+			[]interface{}{
+				36,
+			},
+			"",
+		},
+
+		/*
+			{
+				"basic converters",
+				func(in struct {
+					A string
+				}) string {
+					return in.A + "!"
+				},
+				[]Arg{
+					Named("a", 12),
+					ConverterFunc(func(v int) string { return strconv.Itoa(v) }),
+					ConverterFunc(func(struct {
+						A int
+					}) *struct {
+						A string
+					} {
+						return nil
+					}),
+				},
+				[]interface{}{"12!"},
+				"",
+			},
+		*/
 	}
 
 	for _, tt := range cases {
