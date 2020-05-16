@@ -1,5 +1,7 @@
 package graph
 
+import "fmt"
+
 // Vertex can be anything.
 type Vertex interface{}
 
@@ -13,6 +15,16 @@ type VertexHashable interface {
 // VertexID returns the unique ID for a vertex.
 func VertexID(v Vertex) interface{} {
 	return hashcode(v)
+}
+
+// VertexName returns the name of a vertex.
+func VertexName(v Vertex) string {
+	switch v := v.(type) {
+	case fmt.Stringer:
+		return fmt.Sprintf("%s", v)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 // hashcode returns the hashcode for a Vertex.

@@ -1,5 +1,11 @@
 package graph
 
+import (
+	"bytes"
+	"fmt"
+	"sort"
+)
+
 // Graph represents a graph structure.
 //
 // Unless otherwise documented, it is unsafe to call any method on Graph concurrently.
@@ -117,6 +123,44 @@ func (g *Graph) Copy() *Graph {
 	}
 
 	return &g2
+}
+
+// String outputs some human-friendly output for the graph structure.
+func (g *Graph) String() string {
+	var buf bytes.Buffer
+
+	// Build the list of node names and a mapping so that we can more
+	// easily alphabetize the output to remain deterministic.
+	names := make([]string, 0, len(g.hash))
+	mapping := make(map[string]Vertex, len(g.hash))
+	for _, v := range g.hash {
+		name := VertexName(v)
+		names = append(names, name)
+		mapping[name] = v
+	}
+	sort.Strings(names)
+
+	// Write each node in order...
+	for _, name := range names {
+		v := mapping[name]
+		targets := g.adjacencyOut[hashcode(v)]
+
+		buf.WriteString(fmt.Sprintf("%s\n", name))
+
+		// Alphabetize dependencies
+		deps := make([]string, 0, len(targets))
+		for targetHash := range targets {
+			deps = append(deps, VertexName(g.hash[targetHash]))
+		}
+		sort.Strings(deps)
+
+		// Write dependencies
+		for _, d := range deps {
+			buf.WriteString(fmt.Sprintf("  %s\n", d))
+		}
+	}
+
+	return buf.String()
 }
 
 func (g *Graph) init() {

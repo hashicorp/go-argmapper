@@ -11,8 +11,8 @@ import (
 )
 
 type Func struct {
-	fn  reflect.Value
-	arg *structType
+	fn    reflect.Value
+	input *structType
 }
 
 func NewFunc(f interface{}) (*Func, error) {
@@ -41,8 +41,8 @@ func NewFunc(f interface{}) (*Func, error) {
 	}
 
 	return &Func{
-		fn:  fv,
-		arg: structTyp,
+		fn:    fv,
+		input: structTyp,
 	}, nil
 }
 
@@ -62,11 +62,11 @@ func (f *Func) Call(opts ...Arg) Result {
 	vertex := g.Add(funcVertex{
 		Func: f,
 	})
-	for k, f := range f.arg.fields {
-		g.AddEdge(g.Add(valueVertex{
+	for k, f := range f.input.fields {
+		g.AddEdge(vertex, g.Add(valueVertex{
 			Name: k,
 			Type: f.Type,
-		}), vertex)
+		}))
 	}
 
 	// Values is the built up list of values we know about
@@ -87,9 +87,13 @@ func (f *Func) Call(opts ...Arg) Result {
 		vertexValues[input] = v
 	}
 
+	// If we have converters, add those
+	ConvSet(builder.convs).graph(&g)
+	println(g.String())
+
 	// Find all the paths to our function
 	visited := map[interface{}]struct{}{}
-	g.Reverse().DFS(vertex, func(v graph.Vertex, next func() error) error {
+	g.DFS(vertex, func(v graph.Vertex, next func() error) error {
 		// Mark this as visited
 		visited[graph.VertexID(v)] = struct{}{}
 
@@ -102,8 +106,8 @@ func (f *Func) Call(opts ...Arg) Result {
 	})
 
 	// Let's walk the graph and print out our paths
-	println(fmt.Sprintf("%s", g.KahnSort()))
-	for _, current := range g.KahnSort() {
+	println(fmt.Sprintf("%s", g.Reverse().KahnSort()))
+	for _, current := range g.Reverse().KahnSort() {
 		// If we arrived at our function, we've satisfied our inputs.
 		if current == vertex {
 			break
@@ -116,13 +120,28 @@ func (f *Func) Call(opts ...Arg) Result {
 			if val, ok := vertexValues[v]; ok {
 				inValues[v.Name] = val
 			}
+
+		case convVertex:
+			// Call the function. We don't need to specify any converters
+			// here, we only specify our "inValues" because the graph
+			// should guarantee that we have exactly what we need.
+			result := v.Conv.Call(withNamedReflectValues(inValues))
+			if err := result.Err(); err != nil {
+				return Result{buildErr: err}
+			}
+
+			// Get the result
+			v.Conv.outputValues(result, inValues)
+
+		default:
+			panic(fmt.Sprintf("unknown vertex: %v", current))
 		}
 	}
 
 	// Initialize the struct we'll be populating
 	var buildErr error
-	structVal := f.arg.New()
-	for k, _ := range f.arg.fields {
+	structVal := f.input.New()
+	for k, _ := range f.input.fields {
 		v, ok := inValues[k]
 		if !ok {
 			buildErr = multierror.Append(buildErr, fmt.Errorf(

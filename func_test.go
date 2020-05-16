@@ -1,6 +1,7 @@
 package argmapper
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -76,28 +77,26 @@ func TestFunc(t *testing.T) {
 			"",
 		},
 
-		/*
-			{
-				"basic converters",
-				func(in struct {
-					A string
-				}) string {
-					return in.A + "!"
-				},
-				[]Arg{
-					Named("a", 12),
-					WithConvFunc(func(s struct {
-						A int
-					}) struct {
-						A string
-					} {
-						return struct{ A string }{strconv.Itoa(s.A)}
-					}),
-				},
-				[]interface{}{"12!"},
-				"",
+		{
+			"basic converters",
+			func(in struct {
+				A string
+			}) string {
+				return in.A + "!"
 			},
-		*/
+			[]Arg{
+				Named("a", 12),
+				WithConvFunc(func(s struct {
+					A int
+				}) struct {
+					A string
+				} {
+					return struct{ A string }{strconv.Itoa(s.A)}
+				}),
+			},
+			[]interface{}{"12!"},
+			"",
+		},
 	}
 
 	for _, tt := range cases {

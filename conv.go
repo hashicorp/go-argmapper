@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/mitchellh/go-argmapper/internal/dag"
+	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
 // Conv represents a converter function that knows how to convert
@@ -41,29 +41,20 @@ import (
 // to the user. In all cases, the errors are made available in the Result type
 // for logging.
 type Conv struct {
-	input, output *structType
+	*Func
+	output *structType
 }
 
 // NewConv constructs a new converter. See the docs on Conv for more info.
 func NewConv(f interface{}) (*Conv, error) {
-	fv := reflect.ValueOf(f)
-	ft := fv.Type()
-	if k := ft.Kind(); k != reflect.Func {
-		return nil, fmt.Errorf("fn should be a function, got %s", k)
+	// This should be a valid function so build the function first
+	fn, err := NewFunc(f)
+	if err != nil {
+		return nil, err
 	}
 
-	// We only accept zero or 1 arguments right now. In the future we
-	// could potentially expand this to support multiple args that are
-	// all structs we populate but for now lets just simplify this.
-	if ft.NumIn() > 1 {
-		return nil, fmt.Errorf("function must take one struct arg")
-	}
-
-	// Our argument must be a struct
-	typ := ft.In(0)
-	if typ.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("function must take one struct arg")
-	}
+	// Get our type
+	ft := fn.fn.Type()
 
 	// Validate output types.
 	if ft.NumOut() != 1 {
@@ -75,26 +66,34 @@ func NewConv(f interface{}) (*Conv, error) {
 		return nil, fmt.Errorf("first return value must be a struct or *struct")
 	}
 
-	input, err := newStructType(typ)
-	if err != nil {
-		return nil, err
-	}
-
 	output, err := newStructType(out)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Conv{
-		input:  input,
+		Func:   fn,
 		output: output,
 	}, nil
+}
+
+// outputValues extracts the output from the given Result. The Result must
+// be a result of calling Call on this exact Conv. Specifying any other
+// Result is undefined and will likely result in panics.
+func (c *Conv) outputValues(r Result, target map[string]reflect.Value) {
+	// Get our struct
+	v := r.out[0]
+
+	// Go through the fields we know about
+	for name, f := range c.output.fields {
+		target[name] = v.Field(f.Index)
+	}
 }
 
 // ConvSet is a set of converters.
 type ConvSet []*Conv
 
-func (cs ConvSet) graph(g *dag.Graph) {
+func (cs ConvSet) graph(g *graph.Graph) {
 	// Go through all our convs and create the vertices for our inputs and outputs
 	for _, conv := range cs {
 		vertex := g.Add(convVertex{
@@ -103,18 +102,18 @@ func (cs ConvSet) graph(g *dag.Graph) {
 
 		// Add all our inputs and add an edge from the func to the input
 		for k, f := range conv.input.fields {
-			g.Connect(dag.BasicEdge(vertex, g.Add(valueVertex{
+			g.AddEdge(vertex, g.Add(valueVertex{
 				Name: k,
 				Type: f.Type,
-			})))
+			}))
 		}
 
 		// Add all our outputs
-		for k, f := range conv.input.fields {
-			g.Connect(dag.BasicEdge(g.Add(valueVertex{
+		for k, f := range conv.output.fields {
+			g.AddEdge(g.Add(valueVertex{
 				Name: k,
 				Type: f.Type,
-			}), vertex))
+			}), vertex)
 		}
 	}
 }
@@ -133,16 +132,17 @@ type convVertex struct {
 }
 
 func (v *convVertex) Hashcode() interface{} { return v.Conv }
+func (v convVertex) String() string         { return "conv: " + v.Conv.fn.String() }
 
 type funcVertex struct {
 	Func *Func
 }
 
 func (v *funcVertex) Hashcode() interface{} { return v.Func }
-func (v funcVertex) String() string         { return v.Func.fn.String() }
+func (v funcVertex) String() string         { return "func: " + v.Func.fn.String() }
 
 var (
-	_ dag.Hashable = (*convVertex)(nil)
-	_ dag.Hashable = (*funcVertex)(nil)
-	_ dag.Hashable = (*valueVertex)(nil)
+	_ graph.VertexHashable = (*convVertex)(nil)
+	_ graph.VertexHashable = (*funcVertex)(nil)
+	_ graph.VertexHashable = (*valueVertex)(nil)
 )
