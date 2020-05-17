@@ -23,6 +23,10 @@ func (f *Func) Call(opts ...Arg) Result {
 }
 
 func (f *Func) call(cs *callState) Result {
+	wildcard := cs.Wildcard
+	cs.Wildcard = map[*structField]reflect.Value{}
+	defer func() { cs.Wildcard = wildcard }()
+
 	// Go through all our requirements and satisfy them.
 	input := f.input
 	for n, f := range input.fields {
@@ -31,16 +35,14 @@ func (f *Func) call(cs *callState) Result {
 		v, ok := cs.Named[n]
 
 		// If we found a value and its assignable then we've succeeded for this input.
-		if ok {
-			if v.Type().AssignableTo(f.Type) {
-				log.Debug("field satisfied with exact value", "value", v.Interface())
-				continue
-			}
-
-			// We have a value but it wasn't assignable. Set that as the
-			// preferred inherit target so that we can get a conversion.
-			cs.Wildcard[f] = v
+		if ok && v.Type().AssignableTo(f.Type) {
+			log.Debug("field satisfied with exact value", "value", v.Interface())
+			continue
 		}
+
+		// We have a value but it wasn't assignable. Set that as the
+		// preferred inherit target so that we can get a conversion.
+		cs.Wildcard[f] = v
 
 		// Okay we have a value but it wasn't assignable. Ideally we'd find
 		// a converter that can convert our named input type to the target
@@ -63,7 +65,8 @@ func (f *Func) call(cs *callState) Result {
 		// Satisfying our dynamic inputs is a bit different.
 	WILDCARD:
 		for n, f := range input.wildcard {
-			for maybeField, maybeValue := range cs.Wildcard {
+			for maybeField, maybeValue := range wildcard {
+				println("MAYBE", maybeField.Name)
 				if maybeField.Type.AssignableTo(f.Type) {
 					mapping[n] = maybeField.Name
 					cs.Named[maybeField.Name] = maybeValue
@@ -79,6 +82,7 @@ func (f *Func) call(cs *callState) Result {
 			}
 		}
 
+		println("MAP", fmt.Sprintf("%#v", mapping))
 		input = input.inherit(mapping)
 	}
 
