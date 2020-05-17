@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/mitchellh/go-argmapper/internal/graph"
+	"github.com/hashicorp/go-multierror"
 )
 
 // Conv represents a converter function that knows how to convert
@@ -77,110 +77,66 @@ func NewConv(f interface{}) (*Conv, error) {
 	}, nil
 }
 
-func (c *Conv) inherit(mapping map[string]string) {
-}
-
-// outputValues extracts the output from the given Result. The Result must
+// outputState extracts the output from the given Result. The Result must
 // be a result of calling Call on this exact Conv. Specifying any other
 // Result is undefined and will likely result in panics.
-func (c *Conv) outputValues(r Result, state *callState) {
+func (c *Conv) outputState(r Result, state *callState) {
 	// Get our struct
 	v := r.out[0]
 
+	output := c.output.inherit(r.wildcardMapping)
+
 	// Go through the fields we know about
-	for name, f := range c.output.fields {
+	for name, f := range output.fields {
 		state.Named[name] = v.Field(f.Index)
 	}
+}
 
-	// Set our inherited name values
-	for _, f := range c.output.inheritName {
-		state.Inherit[f.Type] = v.Field(f.Index)
+func (c *Conv) provides(f *structField) int {
+	result := -1
+	for _, target := range c.output.fields {
+		if v := target.assignableTo(f); v > result {
+			result = v
+		}
 	}
+	for _, target := range c.output.wildcard {
+		if v := target.assignableTo(f); v > result {
+			result = v
+		}
+	}
+
+	return result
 }
 
 // ConvSet is a set of converters.
 type ConvSet []*Conv
 
-func (cs ConvSet) graph(g *graph.Graph) {
-	// Go through all our convs and create the vertices for our inputs and outputs
-	for _, conv := range cs {
-		vertex := g.Add(convVertex{
-			Conv: conv,
-		})
+func (s ConvSet) provide(cs *callState, f *structField) (bool, error) {
+	log := cs.Logger.With("field", f)
+	log.Trace("looking for converter")
 
-		// Add all our inputs and add an edge from the func to the input
-		for k, f := range conv.input.fields {
-			g.AddEdge(vertex, g.Add(valueVertex{
-				Name: k,
-				Type: f.Type,
-			}))
-		}
-		for _, f := range conv.input.inheritName {
-			g.AddEdgeWeighted(vertex, g.Add(inheritNameVertex{
-				Type: f.Type,
-			}), 50)
+	var merr error
+	for _, c := range s {
+		score := c.provides(f)
+		log.Trace("converter provides score", "conv", c, "score", score)
+
+		// If this converter can't provide the value we're looking for
+		// then skip it.
+		if score < 0 {
+			continue
 		}
 
-		// Add all our outputs
-		for k, f := range conv.output.fields {
-			g.AddEdge(g.Add(valueVertex{
-				Name: k,
-				Type: f.Type,
-			}), vertex)
+		// It can provide it! Try to populate the result.
+		result := c.call(cs)
+		if err := result.Err(); err != nil {
+			merr = multierror.Append(merr, err)
+			continue
 		}
-		for _, f := range conv.output.inheritName {
-			g.AddEdgeWeighted(g.Add(templateResultVertex{
-				Type: f.Type,
-			}), vertex, 50)
-		}
+
+		// Success. Set the output and we're good to go.
+		c.outputState(result, cs)
+		return true, nil
 	}
+
+	return false, merr
 }
-
-type inheritNameVertex struct {
-	Type reflect.Type
-}
-
-func (v *inheritNameVertex) Hashcode() interface{} {
-	return fmt.Sprintf("-> */%s", v.Type.String())
-}
-
-type templateResultVertex struct {
-	Type reflect.Type
-}
-
-func (v *templateResultVertex) Hashcode() interface{} {
-	return fmt.Sprintf("<- */%s", v.Type.String())
-}
-
-type valueVertex struct {
-	Name string
-	Type reflect.Type
-}
-
-func (v *valueVertex) Hashcode() interface{} {
-	return fmt.Sprintf("%s/%s", v.Name, v.Type.String())
-}
-
-type convVertex struct {
-	Conv *Conv
-}
-
-func (v *convVertex) Hashcode() interface{} { return v.Conv }
-func (v convVertex) String() string         { return "conv: " + v.Conv.fn.String() }
-
-type funcVertex struct {
-	Func *Func
-}
-
-func (v *funcVertex) Hashcode() interface{} { return v.Func }
-func (v funcVertex) String() string         { return "func: " + v.Func.fn.String() }
-
-type inputVertex struct{}
-
-func (v inputVertex) String() string { return "input root" }
-
-var (
-	_ graph.VertexHashable = (*convVertex)(nil)
-	_ graph.VertexHashable = (*funcVertex)(nil)
-	_ graph.VertexHashable = (*valueVertex)(nil)
-)

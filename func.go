@@ -41,5 +41,9 @@ func NewFunc(f interface{}) (*Func, error) {
 	}, nil
 }
 
+func (f *Func) String() string {
+	return f.fn.String()
+}
+
 // errType is used for comparison in Spec
 var errType = reflect.TypeOf((*error)(nil)).Elem()
