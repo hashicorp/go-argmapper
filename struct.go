@@ -9,6 +9,11 @@ import (
 type structType struct {
 	typ    reflect.Type
 	fields map[string]*structField
+
+	// inheritName is the list of fields with inheritName set. These
+	// are not listed in "fields" since they are nameless and instead
+	// just match whatever name of a matching type.
+	inheritName map[string]*structField
 }
 
 type structField struct {
@@ -24,8 +29,9 @@ func newStructType(typ reflect.Type) (*structType, error) {
 
 	// We will accumulate our results here
 	result := &structType{
-		typ:    typ,
-		fields: make(map[string]*structField),
+		typ:         typ,
+		fields:      make(map[string]*structField),
+		inheritName: make(map[string]*structField),
 	}
 
 	// Go through the fields and record them all
@@ -67,9 +73,15 @@ func newStructType(typ reflect.Type) (*structType, error) {
 		name = strings.ToLower(name)
 
 		// Record it
-		result.fields[name] = &structField{
+		field := &structField{
 			Index: i,
 			Type:  sf.Type,
+		}
+
+		if v, ok := options["inheritName"]; ok {
+			result.inheritName[v] = field
+		} else {
+			result.fields[name] = field
 		}
 	}
 
@@ -84,6 +96,39 @@ func (t *structType) New() *structValue {
 	}
 }
 
+func (t *structType) copy() *structType {
+	fields := map[string]*structField{}
+	for k, v := range t.fields {
+		fields[k] = v
+	}
+
+	inheritName := map[string]*structField{}
+	for k, v := range t.inheritName {
+		inheritName[k] = v
+	}
+
+	return &structType{
+		typ:         t.typ,
+		fields:      fields,
+		inheritName: inheritName,
+	}
+}
+
+// inherit populates the inherited fields. mapping is a map where the key is
+// the inherited group key and the value is the name of the input to
+// look for.
+func (t *structType) inherit(mapping map[string]string) *structType {
+	result := t.copy()
+	for k, v := range mapping {
+		if f, ok := result.inheritName[k]; ok {
+			delete(result.inheritName, k)
+			result.fields[v] = f
+		}
+	}
+
+	return result
+}
+
 type structValue struct {
 	typ   *structType
 	value reflect.Value
@@ -93,6 +138,10 @@ func (v *structValue) Value() reflect.Value {
 	return v.value
 }
 
-func (v *structValue) Field(n string) reflect.Value {
-	return v.value.Field(v.typ.fields[n].Index)
+func (v *structValue) FieldNamed(n string) reflect.Value {
+	return v.Field(v.typ.fields[n].Index)
+}
+
+func (v *structValue) Field(idx int) reflect.Value {
+	return v.value.Field(idx)
 }

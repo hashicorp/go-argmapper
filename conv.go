@@ -77,16 +77,24 @@ func NewConv(f interface{}) (*Conv, error) {
 	}, nil
 }
 
+func (c *Conv) inherit(mapping map[string]string) {
+}
+
 // outputValues extracts the output from the given Result. The Result must
 // be a result of calling Call on this exact Conv. Specifying any other
 // Result is undefined and will likely result in panics.
-func (c *Conv) outputValues(r Result, target map[string]reflect.Value) {
+func (c *Conv) outputValues(r Result, state *callState) {
 	// Get our struct
 	v := r.out[0]
 
 	// Go through the fields we know about
 	for name, f := range c.output.fields {
-		target[name] = v.Field(f.Index)
+		state.Named[name] = v.Field(f.Index)
+	}
+
+	// Set our inherited name values
+	for _, f := range c.output.inheritName {
+		state.Inherit[f.Type] = v.Field(f.Index)
 	}
 }
 
@@ -107,6 +115,11 @@ func (cs ConvSet) graph(g *graph.Graph) {
 				Type: f.Type,
 			}))
 		}
+		for _, f := range conv.input.inheritName {
+			g.AddEdgeWeighted(vertex, g.Add(inheritNameVertex{
+				Type: f.Type,
+			}), 50)
+		}
 
 		// Add all our outputs
 		for k, f := range conv.output.fields {
@@ -115,7 +128,28 @@ func (cs ConvSet) graph(g *graph.Graph) {
 				Type: f.Type,
 			}), vertex)
 		}
+		for _, f := range conv.output.inheritName {
+			g.AddEdgeWeighted(g.Add(templateResultVertex{
+				Type: f.Type,
+			}), vertex, 50)
+		}
 	}
+}
+
+type inheritNameVertex struct {
+	Type reflect.Type
+}
+
+func (v *inheritNameVertex) Hashcode() interface{} {
+	return fmt.Sprintf("-> */%s", v.Type.String())
+}
+
+type templateResultVertex struct {
+	Type reflect.Type
+}
+
+func (v *templateResultVertex) Hashcode() interface{} {
+	return fmt.Sprintf("<- */%s", v.Type.String())
 }
 
 type valueVertex struct {
@@ -140,6 +174,10 @@ type funcVertex struct {
 
 func (v *funcVertex) Hashcode() interface{} { return v.Func }
 func (v funcVertex) String() string         { return "func: " + v.Func.fn.String() }
+
+type inputVertex struct{}
+
+func (v inputVertex) String() string { return "input root" }
 
 var (
 	_ graph.VertexHashable = (*convVertex)(nil)

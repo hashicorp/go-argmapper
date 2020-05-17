@@ -2,6 +2,7 @@ package argmapper
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -78,7 +79,7 @@ func TestFunc(t *testing.T) {
 		},
 
 		{
-			"basic converters",
+			"direct named converter",
 			func(in struct {
 				A string
 			}) string {
@@ -92,6 +93,51 @@ func TestFunc(t *testing.T) {
 					A string
 				} {
 					return struct{ A string }{strconv.Itoa(s.A)}
+				}),
+			},
+			[]interface{}{"12!"},
+			"",
+		},
+
+		{
+			"generic type converter",
+			func(in struct {
+				A string
+				B int
+			}) string {
+				return strings.Repeat(in.A, in.B)
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 2),
+				/*
+					WithConvFunc(func(s struct {
+						C string
+					}) struct {
+						A string
+					} {
+						return struct {
+							A string
+						}{"FOO"}
+					}),
+					WithConvFunc(func(s struct {
+						C bool
+					}) struct {
+						A string
+					} {
+						return struct {
+							A string
+						}{"FOO"}
+					}),
+				*/
+				WithConvFunc(func(s struct {
+					B int `argmapper:",inheritName"`
+				}) struct {
+					B string `argmapper:",inheritName"`
+				} {
+					return struct {
+						B string `argmapper:",inheritName"`
+					}{strconv.Itoa(s.B)}
 				}),
 			},
 			[]interface{}{"12!"},

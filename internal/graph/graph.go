@@ -71,7 +71,7 @@ func (g *Graph) Vertices() []Vertex {
 // AddEdge adds a directed edge to the graph from v1 to v2. Both v1 and v2
 // must already be in the Graph via Add or this will do nothing.
 func (g *Graph) AddEdge(v1, v2 Vertex) {
-	g.AddEdgeWeighted(v1, v2, 0)
+	g.AddEdgeWeighted(v1, v2, 1)
 }
 
 // AddEdgeWeighted adds a weighted edge. This is the same as AddEdge but
