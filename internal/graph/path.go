@@ -17,6 +17,10 @@ func (g *Graph) TopoShortestPath(L []Vertex) (distTo map[interface{}]int, edgeTo
 	         - Set dist(v) <- dist(u) + w(u, v);
 	*/
 
+	// Set the distance to the source to 0;
+	// Set the distances to all other vertices to infinity;
+	// We don't actually set anything to "infinity" here since we can simulate
+	// it by checking for existance in the map.
 	distTo = map[interface{}]int{}
 	edgeTo = map[interface{}]Vertex{}
 
@@ -25,7 +29,7 @@ func (g *Graph) TopoShortestPath(L []Vertex) (distTo map[interface{}]int, edgeTo
 		uh := hashcode(u)
 
 		// Walk through all neighbors v of u;
-		for vh, weight := range g.adjacencyIn[uh] {
+		for vh, weight := range g.adjacencyOut[uh] {
 			// x = dist(u) + w(u, v)
 			x := distTo[uh] + weight
 
