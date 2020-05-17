@@ -115,24 +115,26 @@ func TestFunc(t *testing.T) {
 			[]Arg{
 				Named("a", 12),
 				Named("b", 2),
-				WithConvFunc(func(s struct {
-					C string
-				}) struct {
-					A string
-				} {
-					return struct {
+				/*
+					WithConvFunc(func(s struct {
+						C string
+					}) struct {
 						A string
-					}{"FOO"}
-				}),
-				WithConvFunc(func(s struct {
-					C bool
-				}) struct {
-					A string
-				} {
-					return struct {
+					} {
+						return struct {
+							A string
+						}{"FOO"}
+					}),
+					WithConvFunc(func(s struct {
+						C bool
+					}) struct {
 						A string
-					}{"FOO"}
-				}),
+					} {
+						return struct {
+							A string
+						}{"FOO"}
+					}),
+				*/
 				WithConvFunc(func(s struct {
 					B int `argmapper:",wildcard"`
 				}) struct {
