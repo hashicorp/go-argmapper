@@ -5,13 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
-
-func init() {
-	hclog.L().SetLevel(hclog.Trace)
-}
 
 func TestFunc(t *testing.T) {
 	cases := []struct {
@@ -136,16 +131,16 @@ func TestFunc(t *testing.T) {
 					}),
 				*/
 				WithConvFunc(func(s struct {
-					B int `argmapper:",wildcard"`
+					B int `argmapper:",inheritName"`
 				}) struct {
-					B string `argmapper:",wildcard"`
+					B string `argmapper:",inheritName"`
 				} {
 					return struct {
-						B string `argmapper:",wildcard"`
+						B string `argmapper:",inheritName"`
 					}{strconv.Itoa(s.B)}
 				}),
 			},
-			[]interface{}{"1212"},
+			[]interface{}{"12!"},
 			"",
 		},
 	}

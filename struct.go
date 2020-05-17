@@ -10,15 +10,14 @@ type structType struct {
 	typ    reflect.Type
 	fields map[string]*structField
 
-	// wildcard is the list of fields with wildcard set. These
+	// inheritName is the list of fields with inheritName set. These
 	// are not listed in "fields" since they are nameless and instead
 	// just match whatever name of a matching type.
-	wildcard map[string]*structField
+	inheritName map[string]*structField
 }
 
 type structField struct {
 	Index int
-	Name  string
 	Type  reflect.Type
 }
 
@@ -30,9 +29,9 @@ func newStructType(typ reflect.Type) (*structType, error) {
 
 	// We will accumulate our results here
 	result := &structType{
-		typ:      typ,
-		fields:   make(map[string]*structField),
-		wildcard: make(map[string]*structField),
+		typ:         typ,
+		fields:      make(map[string]*structField),
+		inheritName: make(map[string]*structField),
 	}
 
 	// Go through the fields and record them all
@@ -76,13 +75,11 @@ func newStructType(typ reflect.Type) (*structType, error) {
 		// Record it
 		field := &structField{
 			Index: i,
-			Name:  name,
 			Type:  sf.Type,
 		}
 
-		if v, ok := options["wildcard"]; ok {
-			field.Name = ""
-			result.wildcard[v] = field
+		if v, ok := options["inheritName"]; ok {
+			result.inheritName[v] = field
 		} else {
 			result.fields[name] = field
 		}
@@ -105,15 +102,15 @@ func (t *structType) copy() *structType {
 		fields[k] = v
 	}
 
-	wildcard := map[string]*structField{}
-	for k, v := range t.wildcard {
-		wildcard[k] = v
+	inheritName := map[string]*structField{}
+	for k, v := range t.inheritName {
+		inheritName[k] = v
 	}
 
 	return &structType{
-		typ:      t.typ,
-		fields:   fields,
-		wildcard: wildcard,
+		typ:         t.typ,
+		fields:      fields,
+		inheritName: inheritName,
 	}
 }
 
@@ -123,40 +120,13 @@ func (t *structType) copy() *structType {
 func (t *structType) inherit(mapping map[string]string) *structType {
 	result := t.copy()
 	for k, v := range mapping {
-		if f, ok := result.wildcard[k]; ok {
+		if f, ok := result.inheritName[k]; ok {
+			delete(result.inheritName, k)
 			result.fields[v] = f
 		}
 	}
 
 	return result
-}
-
-// assignableTo returns an assignability score for setting f onto f2.
-// The higher the score, the better match it is. Anything result >= 0
-// however can technically be assigned.
-func (f *structField) assignableTo(f2 *structField) int {
-	// If they're not assignable then they never match.
-	if !f.Type.AssignableTo(f2.Type) {
-		return -1
-	}
-
-	// If the names match, then we've got a slam dunk. Highest score.
-	if f.Name == f2.Name {
-		return 10
-	}
-
-	// If we're a wildcard, then we can be assigned to anything. But
-	// we prefer to match names so give a lower score.
-	if f.Name == "" || f2.Name == "" {
-		return 5
-	}
-
-	// Assignable but neither is a wildcard.
-	return -1
-}
-
-func (f *structField) String() string {
-	return f.Name
 }
 
 type structValue struct {

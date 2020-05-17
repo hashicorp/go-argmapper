@@ -7,8 +7,6 @@ import "reflect"
 type Result struct {
 	out      []reflect.Value
 	buildErr error
-
-	wildcardMapping map[string]string
 }
 
 // Err returns any error that occurred as part of the call. This can
