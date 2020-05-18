@@ -3,13 +3,16 @@ package argmapper
 import (
 	"reflect"
 	"strings"
+
+	"github.com/hashicorp/go-hclog"
 )
 
 type Arg func(*argBuilder) error
 
 type argBuilder struct {
-	named map[string]reflect.Value
-	convs []*Conv
+	logger hclog.Logger
+	named  map[string]reflect.Value
+	convs  []*Conv
 }
 
 // Named specifies a named argument with the given value. This will satisfy

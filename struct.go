@@ -62,7 +62,7 @@ func newStructType(typ reflect.Type) (*structType, error) {
 			for _, v := range parts[1:] {
 				idx := strings.Index(v, "=")
 				if idx == -1 {
-					options[v] = "1"
+					options[v] = ""
 				} else {
 					options[v[:idx]] = v[idx+1:]
 				}

@@ -2,7 +2,7 @@ package graph
 
 // KahnSort will return the topological sort of the graph using Kahn's algorithm.
 // The graph must not have any cycles or this will panic.
-func (g *Graph) KahnSort() []Vertex {
+func (g *Graph) KahnSort() TopoOrder {
 	/*
 	   L ← Empty list that will contain the sorted elements
 	   S ← Set of all nodes with no incoming edge
@@ -66,4 +66,18 @@ func (g *Graph) KahnSort() []Vertex {
 	}
 
 	return L
+}
+
+// TopoOrder is a topological ordering.
+type TopoOrder []Vertex
+
+// At returns a new TopoOrder that starts at the given vertex.
+// This returns a slice into the ordering so it is not safe to modify.
+func (t TopoOrder) At(v Vertex) TopoOrder {
+	for i := 0; i < len(t); i++ {
+		if t[i] == v {
+			return t[i:]
+		}
+	}
+	return nil
 }

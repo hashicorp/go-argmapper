@@ -21,14 +21,15 @@ type Graph struct {
 	hash map[interface{}]Vertex
 }
 
-// Add adds a vertex to the graph.
+// Add adds a vertex to the graph. If a vertex with the same identity exists
+// this will overwrite that vertex.
 func (g *Graph) Add(v Vertex) Vertex {
 	g.init()
 	h := hashcode(v)
+	g.hash[h] = v
 	if _, ok := g.adjacencyOut[h]; !ok {
 		g.adjacencyOut[h] = make(map[interface{}]int)
 		g.adjacencyIn[h] = make(map[interface{}]int)
-		g.hash[h] = v
 	}
 	return v
 }
@@ -58,6 +59,13 @@ func (g *Graph) Remove(v Vertex) Vertex {
 	return v
 }
 
+// Vertex returns the vertex by id. This can be done to get the node that
+// is actually in the graph.
+func (g *Graph) Vertex(id interface{}) Vertex {
+	g.init()
+	return g.hash[id]
+}
+
 // Vertices returns the list of all the vertices in this graph.
 func (g *Graph) Vertices() []Vertex {
 	result := make([]Vertex, 0, len(g.hash))
@@ -75,22 +83,12 @@ func (g *Graph) AddEdge(v1, v2 Vertex) {
 }
 
 // AddEdgeWeighted adds a weighted edge. This is the same as AddEdge but
-// with the specified weight.
+// with the specified weight. This will overwrite any existing edges.
 func (g *Graph) AddEdgeWeighted(v1, v2 Vertex, weight int) {
 	g.init()
 	h1, h2 := hashcode(v1), hashcode(v2)
-
-	// If we already are in the output map, then we assume we're alread in
-	// the in map as well as exit.
-	outMap := g.adjacencyOut[h1]
-	if _, ok := outMap[h2]; ok {
-		return
-	}
-	inMap := g.adjacencyIn[h2]
-
-	// Add our edges
-	outMap[h2] = weight
-	inMap[h1] = weight
+	g.adjacencyOut[h1][h2] = weight
+	g.adjacencyIn[h2][h1] = weight
 }
 
 func (g *Graph) RemoveEdge(v1, v2 Vertex) {
@@ -169,6 +167,7 @@ func (g *Graph) Copy() *Graph {
 // String outputs some human-friendly output for the graph structure.
 func (g *Graph) String() string {
 	var buf bytes.Buffer
+	buf.WriteString("\n")
 
 	// Build the list of node names and a mapping so that we can more
 	// easily alphabetize the output to remain deterministic.

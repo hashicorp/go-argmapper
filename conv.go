@@ -83,18 +83,30 @@ func (c *Conv) inherit(mapping map[string]string) {
 // outputValues extracts the output from the given Result. The Result must
 // be a result of calling Call on this exact Conv. Specifying any other
 // Result is undefined and will likely result in panics.
-func (c *Conv) outputValues(r Result, state *callState) {
+func (c *Conv) outputValues(r Result, vs []graph.Vertex, state *callState) {
 	// Get our struct
-	v := r.out[0]
+	structVal := r.out[0]
 
-	// Go through the fields we know about
-	for name, f := range c.output.fields {
-		state.Named[name] = v.Field(f.Index)
-	}
+	// Go through our out edges to find all our results so we can update
+	// the graph nodes with our values. Along the way, we also update our
+	// total call state.
+	for _, v := range vs {
+		switch v := v.(type) {
+		case *valueVertex:
+			// Set the value on the vertex. During the graph walk, we'll
+			// set the Named value.
+			v.Value = structVal.Field(c.output.fields[v.Name].Index)
 
-	// Set our inherited name values
-	for _, f := range c.output.inheritName {
-		state.Inherit[f.Type] = v.Field(f.Index)
+		case *templateResultVertex:
+			// Get our field with the same name
+			field := c.output.inheritName[v.Name]
+
+			// Determine our target name
+			target := state.Mapping[v.Name]
+
+			v.ValueName = target.Name
+			v.Value = structVal.Field(field.Index)
+		}
 	}
 }
 
@@ -104,32 +116,32 @@ type ConvSet []*Conv
 func (cs ConvSet) graph(g *graph.Graph) {
 	// Go through all our convs and create the vertices for our inputs and outputs
 	for _, conv := range cs {
-		vertex := g.Add(convVertex{
+		vertex := g.Add(&convVertex{
 			Conv: conv,
 		})
 
 		// Add all our inputs and add an edge from the func to the input
 		for k, f := range conv.input.fields {
-			g.AddEdge(vertex, g.Add(valueVertex{
+			g.AddEdge(vertex, g.Add(&valueVertex{
 				Name: k,
 				Type: f.Type,
 			}))
 		}
 		for _, f := range conv.input.inheritName {
-			g.AddEdgeWeighted(vertex, g.Add(inheritNameVertex{
+			g.AddEdgeWeighted(vertex, g.Add(&inheritNameVertex{
 				Type: f.Type,
 			}), 50)
 		}
 
 		// Add all our outputs
 		for k, f := range conv.output.fields {
-			g.AddEdge(g.Add(valueVertex{
+			g.AddEdge(g.Add(&valueVertex{
 				Name: k,
 				Type: f.Type,
 			}), vertex)
 		}
 		for _, f := range conv.output.inheritName {
-			g.AddEdgeWeighted(g.Add(templateResultVertex{
+			g.AddEdgeWeighted(g.Add(&templateResultVertex{
 				Type: f.Type,
 			}), vertex, 50)
 		}
@@ -137,24 +149,37 @@ func (cs ConvSet) graph(g *graph.Graph) {
 }
 
 type inheritNameVertex struct {
+	Name string
 	Type reflect.Type
+
+	Value valueVertex
 }
 
 func (v *inheritNameVertex) Hashcode() interface{} {
-	return fmt.Sprintf("-> */%s", v.Type.String())
+	return fmt.Sprintf("-> %s/%s", v.Name, v.Type.String())
 }
 
+func (v *inheritNameVertex) String() string { return v.Hashcode().(string) }
+
 type templateResultVertex struct {
+	Name string
 	Type reflect.Type
+
+	ValueName string
+	Value     reflect.Value
 }
 
 func (v *templateResultVertex) Hashcode() interface{} {
-	return fmt.Sprintf("<- */%s", v.Type.String())
+	return fmt.Sprintf("<- %s/%s", v.Name, v.Type.String())
 }
+
+func (v *templateResultVertex) String() string { return v.Hashcode().(string) }
 
 type valueVertex struct {
 	Name string
 	Type reflect.Type
+
+	Value reflect.Value
 }
 
 func (v *valueVertex) Hashcode() interface{} {
@@ -166,18 +191,18 @@ type convVertex struct {
 }
 
 func (v *convVertex) Hashcode() interface{} { return v.Conv }
-func (v convVertex) String() string         { return "conv: " + v.Conv.fn.String() }
+func (v *convVertex) String() string        { return "conv: " + v.Conv.fn.String() }
 
 type funcVertex struct {
 	Func *Func
 }
 
 func (v *funcVertex) Hashcode() interface{} { return v.Func }
-func (v funcVertex) String() string         { return "func: " + v.Func.fn.String() }
+func (v *funcVertex) String() string        { return "func: " + v.Func.fn.String() }
 
 type inputVertex struct{}
 
-func (v inputVertex) String() string { return "input root" }
+func (v *inputVertex) String() string { return "input root" }
 
 var (
 	_ graph.VertexHashable = (*convVertex)(nil)
