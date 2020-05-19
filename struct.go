@@ -10,10 +10,10 @@ type structType struct {
 	typ    reflect.Type
 	fields map[string]*structField
 
-	// inheritName is the list of fields with inheritName set. These
+	// typedFields is the list of fields with typeOnly set. These
 	// are not listed in "fields" since they are nameless and instead
 	// just match whatever name of a matching type.
-	inheritName map[string]*structField
+	typedFields map[string]*structField
 }
 
 type structField struct {
@@ -31,7 +31,7 @@ func newStructType(typ reflect.Type) (*structType, error) {
 	result := &structType{
 		typ:         typ,
 		fields:      make(map[string]*structField),
-		inheritName: make(map[string]*structField),
+		typedFields: make(map[string]*structField),
 	}
 
 	// Go through the fields and record them all
@@ -78,8 +78,8 @@ func newStructType(typ reflect.Type) (*structType, error) {
 			Type:  sf.Type,
 		}
 
-		if v, ok := options["inheritName"]; ok {
-			result.inheritName[v] = field
+		if v, ok := options["typeOnly"]; ok {
+			result.typedFields[v] = field
 		} else {
 			result.fields[name] = field
 		}
@@ -102,31 +102,16 @@ func (t *structType) copy() *structType {
 		fields[k] = v
 	}
 
-	inheritName := map[string]*structField{}
-	for k, v := range t.inheritName {
-		inheritName[k] = v
+	typedFields := map[string]*structField{}
+	for k, v := range t.typedFields {
+		typedFields[k] = v
 	}
 
 	return &structType{
 		typ:         t.typ,
 		fields:      fields,
-		inheritName: inheritName,
+		typedFields: typedFields,
 	}
-}
-
-// inherit populates the inherited fields. mapping is a map where the key is
-// the inherited group key and the value is the name of the input to
-// look for.
-func (t *structType) inherit(mapping map[string]string) *structType {
-	result := t.copy()
-	for k, v := range mapping {
-		if f, ok := result.inheritName[k]; ok {
-			delete(result.inheritName, k)
-			result.fields[v] = f
-		}
-	}
-
-	return result
 }
 
 type structValue struct {

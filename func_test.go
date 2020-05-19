@@ -134,13 +134,13 @@ func TestFunc(t *testing.T) {
 					}{"FOO"}
 				}),
 				WithConvFunc(func(s struct {
-					B int `argmapper:",inheritName"`
+					B int `argmapper:",typeOnly"`
 				}) struct {
-					B string `argmapper:",inheritName"`
+					B string `argmapper:",typeOnly"`
 				} {
 					println("GOT VALUE", s.B)
 					return struct {
-						B string `argmapper:",inheritName"`
+						B string `argmapper:",typeOnly"`
 					}{strconv.Itoa(s.B)}
 				}),
 			},

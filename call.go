@@ -48,7 +48,7 @@ func (f *Func) Call(opts ...Arg) Result {
 	// we already know about. These are tracked as "vertexI". We also
 	// create a shared "input root" tracked as "vertexIRoot". The shared
 	// input root lets us have a single root entrypoint for the graph.
-	vertexIRoot := g.Add(&inputVertex{})
+	vertexIRoot := g.Add(&inputRootVertex{})
 	vertexI := make([]graph.Vertex, 0, len(builder.named))
 	for k, v := range builder.named {
 		// Add the input
@@ -74,36 +74,32 @@ func (f *Func) Call(opts ...Arg) Result {
 			continue
 		}
 
-		g.AddEdgeWeighted(v, g.Add(&templateResultVertex{
+		g.AddEdgeWeighted(v, g.Add(&typedOutputVertex{
 			Type: v.Type,
-		}), 10)
-		g.AddEdgeWeighted(g.Add(&inheritNameVertex{
+		}), weightTyped)
+		g.AddEdgeWeighted(g.Add(&typedArgVertex{
 			Type: v.Type,
-		}), v, 10)
+		}), v, weightTyped)
 	}
 
 	// Next we do a DFS from each input A in I to the function F.
 	// This gives us the full set of reachable nodes from our inputs
 	// and at most to F. Using this information, we can prune any nodes
 	// that are guaranteed to be unused.
+	//
+	// DFS from the input root and record what we see. We have to reverse the
+	// graph here because we typically have out edges pointing to
+	// requirements, but we're going from requirements (inputs) to
+	// the function.
 	visited := map[interface{}]struct{}{graph.VertexID(vertexF): struct{}{}}
-	for _, vertexA := range vertexI {
-		// Mark our input as visited since DFS starts at the out edges
-		visited[graph.VertexID(vertexA)] = struct{}{}
+	g.Reverse().DFS(vertexIRoot, func(v graph.Vertex, next func() error) error {
+		if v == vertexF {
+			return nil
+		}
 
-		// DFS from A and record what we see. We have to reverse the
-		// graph here because we typically have out edges pointing to
-		// requirements, but we're going from requirements (inputs) to
-		// the function.
-		g.Reverse().DFS(vertexA, func(v graph.Vertex, next func() error) error {
-			if v == vertexF {
-				return nil
-			}
-
-			visited[graph.VertexID(v)] = struct{}{}
-			return next()
-		})
-	}
+		visited[graph.VertexID(v)] = struct{}{}
+		return next()
+	})
 
 	// Output our full graph before we do any pruning
 	log.Trace("full graph", "graph", g.String())
@@ -145,7 +141,7 @@ func (f *Func) Call(opts ...Arg) Result {
 			for _, raw := range currentG.Vertices() {
 				if v, ok := raw.(*valueVertex); ok && v.Name == currentValue.Name {
 					for _, src := range currentG.InEdges(raw) {
-						currentG.AddEdgeWeighted(src, raw, -1)
+						currentG.AddEdgeWeighted(src, raw, weightMatchingName)
 					}
 				}
 			}
@@ -206,7 +202,7 @@ func (f *Func) Call(opts ...Arg) Result {
 
 				if pathIdx > 0 {
 					prev := path[pathIdx-1]
-					if r, ok := prev.(*templateResultVertex); ok {
+					if r, ok := prev.(*typedOutputVertex); ok {
 						log.Trace("setting node value", "value", r.Value)
 						v.Value = r.Value
 					}
@@ -217,7 +213,7 @@ func (f *Func) Call(opts ...Arg) Result {
 					state.Named[v.Name] = v.Value
 				}
 
-			case *inheritNameVertex:
+			case *typedArgVertex:
 				// The value of this is the last value vertex we saw. The graph
 				// walk should ensure this is the correct type.
 				v.Value = *state.Value
@@ -227,7 +223,7 @@ func (f *Func) Call(opts ...Arg) Result {
 				state.Mapping[v.Name] = &v.Value
 				state.TypedValue[v.Type] = v.Value.Value
 
-			case *templateResultVertex:
+			case *typedOutputVertex:
 				// Set the typed value we can read from.
 				state.TypedValue[v.Type] = v.Value
 
@@ -276,7 +272,7 @@ func (f *Func) call(state *callState) Result {
 		structVal.FieldNamed(k).Set(v)
 	}
 
-	for _, f := range f.input.inheritName {
+	for _, f := range f.input.typedFields {
 		v, ok := state.TypedValue[f.Type]
 		if !ok {
 			buildErr = multierror.Append(buildErr, fmt.Errorf(

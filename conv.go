@@ -97,9 +97,9 @@ func (c *Conv) outputValues(r Result, vs []graph.Vertex, state *callState) {
 			// set the Named value.
 			v.Value = structVal.Field(c.output.fields[v.Name].Index)
 
-		case *templateResultVertex:
+		case *typedOutputVertex:
 			// Get our field with the same name
-			field := c.output.inheritName[v.Name]
+			field := c.output.typedFields[v.Name]
 
 			// Determine our target name
 			target := state.Mapping[v.Name]
@@ -127,8 +127,8 @@ func (cs ConvSet) graph(g *graph.Graph) {
 				Type: f.Type,
 			}))
 		}
-		for _, f := range conv.input.inheritName {
-			g.AddEdgeWeighted(vertex, g.Add(&inheritNameVertex{
+		for _, f := range conv.input.typedFields {
+			g.AddEdgeWeighted(vertex, g.Add(&typedArgVertex{
 				Type: f.Type,
 			}), 50)
 		}
@@ -140,72 +140,10 @@ func (cs ConvSet) graph(g *graph.Graph) {
 				Type: f.Type,
 			}), vertex)
 		}
-		for _, f := range conv.output.inheritName {
-			g.AddEdgeWeighted(g.Add(&templateResultVertex{
+		for _, f := range conv.output.typedFields {
+			g.AddEdgeWeighted(g.Add(&typedOutputVertex{
 				Type: f.Type,
 			}), vertex, 50)
 		}
 	}
 }
-
-type inheritNameVertex struct {
-	Name string
-	Type reflect.Type
-
-	Value valueVertex
-}
-
-func (v *inheritNameVertex) Hashcode() interface{} {
-	return fmt.Sprintf("-> %s/%s", v.Name, v.Type.String())
-}
-
-func (v *inheritNameVertex) String() string { return v.Hashcode().(string) }
-
-type templateResultVertex struct {
-	Name string
-	Type reflect.Type
-
-	ValueName string
-	Value     reflect.Value
-}
-
-func (v *templateResultVertex) Hashcode() interface{} {
-	return fmt.Sprintf("<- %s/%s", v.Name, v.Type.String())
-}
-
-func (v *templateResultVertex) String() string { return v.Hashcode().(string) }
-
-type valueVertex struct {
-	Name string
-	Type reflect.Type
-
-	Value reflect.Value
-}
-
-func (v *valueVertex) Hashcode() interface{} {
-	return fmt.Sprintf("%s/%s", v.Name, v.Type.String())
-}
-
-type convVertex struct {
-	Conv *Conv
-}
-
-func (v *convVertex) Hashcode() interface{} { return v.Conv }
-func (v *convVertex) String() string        { return "conv: " + v.Conv.fn.String() }
-
-type funcVertex struct {
-	Func *Func
-}
-
-func (v *funcVertex) Hashcode() interface{} { return v.Func }
-func (v *funcVertex) String() string        { return "func: " + v.Func.fn.String() }
-
-type inputVertex struct{}
-
-func (v *inputVertex) String() string { return "input root" }
-
-var (
-	_ graph.VertexHashable = (*convVertex)(nil)
-	_ graph.VertexHashable = (*funcVertex)(nil)
-	_ graph.VertexHashable = (*valueVertex)(nil)
-)
