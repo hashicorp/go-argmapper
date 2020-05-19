@@ -165,6 +165,34 @@ func TestFunc(t *testing.T) {
 			[]interface{}{"1212"},
 			"",
 		},
+
+		{
+			"type converter with multiple typeOnly fields",
+			func(in struct {
+				A string
+				B int
+			}) string {
+				return strings.Repeat(in.A, in.B)
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", "AB"),
+				WithConvFunc(func(s struct {
+					C string `argmapper:",typeOnly"`
+					D int    `argmapper:",typeOnly"`
+				}) struct {
+					C int    `argmapper:",typeOnly"`
+					D string `argmapper:",typeOnly"`
+				} {
+					return struct {
+						C int    `argmapper:",typeOnly"`
+						D string `argmapper:",typeOnly"`
+					}{len(s.C), strconv.Itoa(s.D)}
+				}),
+			},
+			[]interface{}{"1212"},
+			"",
+		},
 	}
 
 	for _, tt := range cases {

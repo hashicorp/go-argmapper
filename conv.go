@@ -79,8 +79,6 @@ func (c *Conv) outputValues(r Result, vs []graph.Vertex, state *callState) {
 	structVal := c.output.result(r).out[0]
 	println("OUTPUT", fmt.Sprintf("%#v", structVal.Interface()))
 
-	// TODO: we need to deconstruct LIFTED VALUES
-
 	// Go through our out edges to find all our results so we can update
 	// the graph nodes with our values. Along the way, we also update our
 	// total call state.
@@ -93,7 +91,8 @@ func (c *Conv) outputValues(r Result, vs []graph.Vertex, state *callState) {
 
 		case *typedOutputVertex:
 			// Get our field with the same name
-			field := c.output.typedFields[v.Name]
+			// TODO: this type String is nasty
+			field := c.output.typedFields[v.Type.String()]
 
 			// Determine our target name
 			target := state.Mapping[v.Name]

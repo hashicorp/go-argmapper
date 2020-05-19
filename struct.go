@@ -133,6 +133,7 @@ func newStructTypeFromStruct(typ reflect.Type) (*structType, error) {
 		}
 
 		if v, ok := options["typeOnly"]; ok {
+			v = field.Type.String()
 			result.typedFields[v] = field
 		} else {
 			result.fields[name] = field

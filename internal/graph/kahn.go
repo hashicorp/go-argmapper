@@ -81,3 +81,14 @@ func (t TopoOrder) At(v Vertex) TopoOrder {
 	}
 	return nil
 }
+
+// Until returns a new TopoOrder that ends at (and includes) the given
+// vertex. This returns a slice into the ordering so it is not safe to modify.
+func (t TopoOrder) Until(v Vertex) TopoOrder {
+	for i := 0; i < len(t); i++ {
+		if t[i] == v {
+			return t[:i]
+		}
+	}
+	return nil
+}
