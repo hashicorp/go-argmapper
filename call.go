@@ -107,16 +107,21 @@ func (f *Func) Call(opts ...Arg) Result {
 			continue
 		}
 
-		var valued graph.Vertex
+		keep := map[interface{}]struct{}{}
 		for _, out := range g.OutEdges(v) {
 			if v, ok := out.(*valueVertex); ok && v.Value.IsValid() {
-				valued = v
+				keep[graph.VertexID(out)] = struct{}{}
 				break
 			}
 		}
-		if valued != nil {
+
+		if len(keep) > 0 {
+			for _, v := range vertexI {
+				keep[graph.VertexID(v)] = struct{}{}
+			}
+
 			for _, out := range g.OutEdges(v) {
-				if out != valued {
+				if _, ok := keep[graph.VertexID(out)]; !ok {
 					g.RemoveEdge(v, out)
 				}
 			}
