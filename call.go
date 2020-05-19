@@ -167,127 +167,24 @@ func (f *Func) Call(opts ...Arg) Result {
 	topo := g.Reverse().KahnSort()
 	log.Trace("topological sort", "sort", topo)
 
-	paths := make([][]graph.Vertex, len(vertexT))
-	for i, current := range vertexT {
-		if v := g.Vertex(graph.VertexID(current)); v != nil {
-			current = v
-		} else {
-			return Result{buildErr: fmt.Errorf(
-				"argument cannot be satisfied: %s", current.(*valueVertex).Name)}
-		}
-
-		currentG := &g
-
-		// For value vertices, we discount any other values that share the
-		// same name. This lets our shortest paths prefer matching through
-		// same-named arguments.
-		if currentValue, ok := current.(*valueVertex); ok {
-			currentG = currentG.Copy()
-			for _, raw := range currentG.Vertices() {
-				if v, ok := raw.(*valueVertex); ok && v.Name == currentValue.Name {
-					for _, src := range currentG.InEdges(raw) {
-						currentG.AddEdgeWeighted(src, raw, weightMatchingName)
-					}
-				}
-			}
-		}
-
-		// Get the shortest path data. We need to reverse the graph here since
-		// the topo sort is from the reversal as well. We have to calculate
-		// the shortest path for each vertexT value because we may change
-		// edge weights above. We can reuse the topo value because the shape
-		// of the graph is not changing.
-		_, edgeTo := currentG.Reverse().TopoShortestPath(topo)
-
-		// With the latest shortest paths, let's add the path for this target.
-		paths[i] = currentG.EdgeToPath(current, edgeTo)
-		log.Trace("path for target", "target", current, "path", paths[i])
-	}
-	log.Trace("graph after shortest path detection", "graph", g.String())
-
-	// Go through each path
+	// Build our call state and attempt to reach our target which is our
+	// function. This will recursively reach various conversion targets
+	// as necessary.
 	state := newCallState()
-	remaining := len(paths)
-	idx := 0
-	for remaining > 0 {
-		path := paths[idx]
-		if len(path) == 0 {
-			idx++
-			continue
-		}
-
-		pathIdx := 0
-		for pathIdx = 0; pathIdx < len(path); pathIdx++ {
-			log := log.With("current", path[pathIdx])
-			log.Trace("executing node")
-
-			switch v := path[pathIdx].(type) {
-			case *valueVertex:
-				// Store the last viewed vertex in our path state
-				state.Value = v
-
-				if pathIdx > 0 {
-					prev := path[pathIdx-1]
-					if r, ok := prev.(*typedOutputVertex); ok {
-						log.Trace("setting node value", "value", r.Value)
-						v.Value = r.Value
-					}
-				}
-
-				// If we have a valid value set, then put it on our named list.
-				if v.Value.IsValid() {
-					state.Named[v.Name] = v.Value
-				}
-
-			case *typedArgVertex:
-				// The value of this is the last value vertex we saw. The graph
-				// walk should ensure this is the correct type.
-				v.Value = *state.Value
-
-				// Setup our mapping so that we know that this wildcard
-				// maps to this name.
-				state.Mapping[v.Name] = &v.Value
-				state.TypedValue[v.Type] = v.Value.Value
-
-			case *typedOutputVertex:
-				// Set the typed value we can read from.
-				state.TypedValue[v.Type] = v.Value
-
-			case *convVertex:
-				if err := f.convExecute(log.Named(graph.VertexName(v)), &g, topo, v, state); err != nil {
-					return resultError(err)
-				}
-
-				result := v.Conv.call(state)
-				if err := result.Err(); err != nil {
-					return resultError(err)
-				}
-
-				// Update our graph nodes
-				v.Conv.outputValues(result, g.InEdges(v), state)
-
-			default:
-				panic(fmt.Sprintf("unknown vertex: %v", v))
-			}
-		}
-
-		paths[idx] = path[pathIdx:]
-		if len(paths[idx]) == 0 {
-			remaining--
-		}
-		idx++
+	if err := f.reachTarget(log, &g, topo, vertexF, state); err != nil {
+		return resultError(err)
 	}
 
 	return f.call(state)
 }
 
-// convExecute executes the the given convVertex by ensuring we satisfy
+// reachTarget executes the the given convVertex by ensuring we satisfy
 // all the inbound arguments first and then calling it.
-func (f *Func) convExecute(
+func (f *Func) reachTarget(
 	log hclog.Logger,
 	g *graph.Graph,
 	topo graph.TopoOrder,
-	target *convVertex,
+	target graph.Vertex,
 	state *callState,
 ) error {
 	// Look at the out edges, since these are the requirements for the conv
@@ -298,9 +195,6 @@ func (f *Func) convExecute(
 	for _, out := range g.OutEdges(target) {
 		skip := false
 		switch v := out.(type) {
-		case *valueVertex:
-			skip = v.Value.IsValid()
-
 		case *typedArgVertex:
 			skip = v.Value.Value.IsValid()
 		}
@@ -395,7 +289,7 @@ func (f *Func) convExecute(
 
 			case *convVertex:
 				// Reach our arguments if they aren't already.
-				if err := f.convExecute(
+				if err := f.reachTarget(
 					log.Named(graph.VertexName(v)),
 					g,
 					topo,
