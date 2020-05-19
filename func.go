@@ -24,13 +24,7 @@ func NewFunc(f interface{}) (*Func, error) {
 		return nil, fmt.Errorf("function must take one struct arg")
 	}
 
-	// Our argument must be a struct
-	typ := ft.In(0)
-	if typ.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("function must take one struct arg")
-	}
-
-	structTyp, err := newStructType(typ)
+	structTyp, err := newStructType(ft.NumIn(), ft.In)
 	if err != nil {
 		return nil, err
 	}

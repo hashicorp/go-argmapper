@@ -3,8 +3,19 @@ package argmapper
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
+
+var liftedNameMap = map[int]string{}
+
+const liftedNameMax = 64
+
+func init() {
+	for i := 0; i < liftedNameMax; i++ {
+		liftedNameMap[i] = "A__" + strconv.Itoa(i)
+	}
+}
 
 type structType struct {
 	typ    reflect.Type
@@ -14,6 +25,11 @@ type structType struct {
 	// are not listed in "fields" since they are nameless and instead
 	// just match whatever name of a matching type.
 	typedFields map[string]*structField
+
+	// isLifted is if this represents a lifted struct. A lifted struct
+	// is one where we automatically converted flat argument lists to
+	// structs.
+	isLifted bool
 }
 
 type structField struct {
@@ -21,7 +37,45 @@ type structField struct {
 	Type  reflect.Type
 }
 
-func newStructType(typ reflect.Type) (*structType, error) {
+func newStructType(count int, get func(int) reflect.Type) (*structType, error) {
+	// We require functions take one argument. In reality we should be able
+	// to accept zero argument functions but there are a lot of assumptions
+	// we haven't resolved yet. This shouldn't be too difficult to support.
+	if count == 0 {
+		return nil, fmt.Errorf("function must take at least one argument")
+	}
+
+	// If we have exactly one argument, let's check if its a struct. If
+	// it is then we treat it as the full value.
+	if count == 1 {
+		t := get(0)
+		if t.Kind() == reflect.Struct {
+			return newStructTypeFromStruct(t)
+		}
+	}
+
+	// We need to lift the arguments into a "struct".
+	var sf []reflect.StructField
+	for i := 0; i < count; i++ {
+		sf = append(sf, reflect.StructField{
+			Name: liftedNameMap[i],
+			Type: get(i),
+
+			// TODO: won't work with multiple
+			Tag: reflect.StructTag(`argmapper:",typeOnly"`),
+		})
+	}
+
+	t, err := newStructTypeFromStruct(reflect.StructOf(sf))
+	if err != nil {
+		return nil, err
+	}
+
+	t.isLifted = true
+	return t, nil
+}
+
+func newStructTypeFromStruct(typ reflect.Type) (*structType, error) {
 	// Verify our value is a struct
 	if typ.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("struct expected, got %s", typ.Kind())
@@ -96,6 +150,35 @@ func (t *structType) New() *structValue {
 	}
 }
 
+// lifted returns true if this field is lifted.
+func (t *structType) lifted() bool {
+	return t.isLifted
+}
+
+// result takes the result that matches this struct type and adapts it
+// if necessary (if the struct type is lifted or so on).
+func (t *structType) result(r Result) Result {
+	// If we aren't lifted, we return the result as-is.
+	if !t.lifted() {
+		return r
+	}
+
+	// If we are lifted, then we need to translate the output arguments
+	// to their proper types in a struct.
+	structOut := reflect.New(t.typ).Elem()
+	for i := 0; i < liftedNameMax; i++ {
+		f, ok := t.typedFields[liftedNameMap[i]]
+		if !ok {
+			break
+		}
+
+		structOut.Field(f.Index).Set(r.out[i])
+	}
+
+	r.out = []reflect.Value{structOut}
+	return r
+}
+
 func (t *structType) copy() *structType {
 	fields := map[string]*structField{}
 	for k, v := range t.fields {
@@ -119,14 +202,30 @@ type structValue struct {
 	value reflect.Value
 }
 
-func (v *structValue) Value() reflect.Value {
-	return v.value
-}
-
 func (v *structValue) FieldNamed(n string) reflect.Value {
 	return v.Field(v.typ.fields[n].Index)
 }
 
 func (v *structValue) Field(idx int) reflect.Value {
 	return v.value.Field(idx)
+}
+
+func (v *structValue) CallIn() []reflect.Value {
+	// If this is not lifted, return it as-is.
+	if !v.typ.lifted() {
+		return []reflect.Value{v.value}
+	}
+
+	// This is lifted, so we need to unpack them in order.
+	var result []reflect.Value
+	for i := 0; i < liftedNameMax; i++ {
+		f, ok := v.typ.typedFields[liftedNameMap[i]]
+		if !ok {
+			break
+		}
+
+		result = append(result, v.value.Field(f.Index))
+	}
+
+	return result
 }

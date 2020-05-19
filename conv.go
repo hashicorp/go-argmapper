@@ -2,7 +2,6 @@ package argmapper
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/mitchellh/go-argmapper/internal/graph"
 )
@@ -61,12 +60,7 @@ func NewConv(f interface{}) (*Conv, error) {
 		return nil, fmt.Errorf("function must return one or two results")
 	}
 
-	out := ft.Out(0)
-	if out.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("first return value must be a struct or *struct")
-	}
-
-	output, err := newStructType(out)
+	output, err := newStructType(ft.NumOut(), ft.Out)
 	if err != nil {
 		return nil, err
 	}
@@ -77,15 +71,15 @@ func NewConv(f interface{}) (*Conv, error) {
 	}, nil
 }
 
-func (c *Conv) inherit(mapping map[string]string) {
-}
-
 // outputValues extracts the output from the given Result. The Result must
 // be a result of calling Call on this exact Conv. Specifying any other
 // Result is undefined and will likely result in panics.
 func (c *Conv) outputValues(r Result, vs []graph.Vertex, state *callState) {
 	// Get our struct
-	structVal := r.out[0]
+	structVal := c.output.result(r).out[0]
+	println("OUTPUT", fmt.Sprintf("%#v", structVal.Interface()))
+
+	// TODO: we need to deconstruct LIFTED VALUES
 
 	// Go through our out edges to find all our results so we can update
 	// the graph nodes with our values. Along the way, we also update our

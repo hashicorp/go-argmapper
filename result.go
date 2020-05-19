@@ -9,6 +9,11 @@ type Result struct {
 	buildErr error
 }
 
+// resultError returns a Result with an error.
+func resultError(err error) Result {
+	return Result{buildErr: err}
+}
+
 // Err returns any error that occurred as part of the call. This can
 // be an error in the process of calling or it can be an error from the
 // result of the call. argmapper automatically detects a non-nil final

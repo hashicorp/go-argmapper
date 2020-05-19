@@ -10,13 +10,23 @@ import (
 )
 
 func (f *Func) Call(opts ...Arg) Result {
+	// buildErr accumulates any errors that we return at various checkpoints
+	var buildErr error
+
 	// Build up our args
 	builder := &argBuilder{
 		logger: hclog.L(),
 		named:  make(map[string]reflect.Value),
 	}
 	for _, opt := range opts {
-		opt(builder)
+		if err := opt(builder); err != nil {
+			buildErr = multierror.Append(buildErr, err)
+		}
+	}
+
+	// If we got errors building up arguments then we're done.
+	if buildErr != nil {
+		return resultError(buildErr)
 	}
 
 	log := builder.logger
@@ -289,7 +299,7 @@ func (f *Func) call(state *callState) Result {
 	}
 
 	// Call our function
-	out := f.fn.Call([]reflect.Value{structVal.Value()})
+	out := f.fn.Call(structVal.CallIn())
 	return Result{out: out}
 }
 
