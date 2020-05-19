@@ -17,13 +17,6 @@ func NewFunc(f interface{}) (*Func, error) {
 		return nil, fmt.Errorf("fn should be a function, got %s", k)
 	}
 
-	// We only accept zero or 1 arguments right now. In the future we
-	// could potentially expand this to support multiple args that are
-	// all structs we populate but for now lets just simplify this.
-	if ft.NumIn() > 1 {
-		return nil, fmt.Errorf("function must take one struct arg")
-	}
-
 	structTyp, err := newStructType(ft.NumIn(), ft.In)
 	if err != nil {
 		return nil, err

@@ -122,6 +122,22 @@ func TestFunc(t *testing.T) {
 		},
 
 		{
+			"multiple input converter with no struct",
+			func(in struct {
+				A int
+			}) string {
+				return strconv.Itoa(in.A)
+			},
+			[]Arg{
+				Named("a", "foo"),
+				Named("b", 2),
+				WithConvFunc(func(v string, n int) int { return len(v) + n }),
+			},
+			[]interface{}{"5"},
+			"",
+		},
+
+		{
 			"generic type converter",
 			func(in struct {
 				A string

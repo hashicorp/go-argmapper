@@ -167,7 +167,6 @@ func (f *Func) Call(opts ...Arg) Result {
 	topo := g.Reverse().KahnSort()
 	log.Trace("topological sort", "sort", topo)
 
-	visited = map[interface{}]struct{}{graph.VertexID(vertexF): struct{}{}}
 	paths := make([][]graph.Vertex, len(vertexT))
 	for i, current := range vertexT {
 		if v := g.Vertex(graph.VertexID(current)); v != nil {
@@ -203,25 +202,6 @@ func (f *Func) Call(opts ...Arg) Result {
 		// With the latest shortest paths, let's add the path for this target.
 		paths[i] = currentG.EdgeToPath(current, edgeTo)
 		log.Trace("path for target", "target", current, "path", paths[i])
-
-		// FIXME
-		for {
-			currenth := graph.VertexID(current)
-			visited[currenth] = struct{}{}
-			current = edgeTo[currenth]
-			if current == nil {
-				break
-			}
-
-			// TODO: we need to check the in-edges here for function types
-			// and make sure that all the function parameters are visited
-			// since that is required.
-		}
-	}
-	for _, v := range g.Vertices() {
-		if _, ok := visited[graph.VertexID(v)]; !ok {
-			g.Remove(v)
-		}
 	}
 	log.Trace("graph after shortest path detection", "graph", g.String())
 
@@ -326,8 +306,14 @@ func (f *Func) convExecute(
 		}
 
 		if !skip {
+			log.Trace("conv is missing an input", "input", out)
 			vertexT = append(vertexT, out)
 		}
+	}
+
+	if len(vertexT) == 0 {
+		log.Trace("conv satisfied")
+		return nil
 	}
 
 	paths := make([][]graph.Vertex, len(vertexT))
@@ -466,7 +452,8 @@ func (f *Func) call(state *callState) Result {
 		v, ok := state.TypedValue[f.Type]
 		if !ok {
 			buildErr = multierror.Append(buildErr, fmt.Errorf(
-				"argument cannot be satisfied: %d", f.Index))
+				"typed argument cannot be satisfied at index %d (type %s)",
+				f.Index, f.Type.String()))
 			continue
 		}
 
