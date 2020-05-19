@@ -138,6 +138,22 @@ func TestFunc(t *testing.T) {
 		},
 
 		{
+			"chained converters",
+			func(in struct {
+				A int
+			}) string {
+				return strconv.Itoa(in.A)
+			},
+			[]Arg{
+				Named("input", 12),
+				WithConvFunc(func(in int) string { return strconv.Itoa(in) }),
+				WithConvFunc(func(in string) int { return len(in) }),
+			},
+			[]interface{}{"2"},
+			"",
+		},
+
+		{
 			"generic type converter",
 			func(in struct {
 				A string

@@ -93,11 +93,6 @@ func (c *Conv) outputValues(r Result, vs []graph.Vertex, state *callState) {
 			// Get our field with the same name
 			// TODO: this type String is nasty
 			field := c.output.typedFields[v.Type.String()]
-
-			// Determine our target name
-			target := state.Mapping[v.Name]
-
-			v.ValueName = target.Name
 			v.Value = structVal.Field(field.Index)
 		}
 	}

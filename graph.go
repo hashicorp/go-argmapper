@@ -54,11 +54,11 @@ type typedArgVertex struct {
 	Name string
 	Type reflect.Type
 
-	Value valueVertex
+	Value reflect.Value
 }
 
 func (v *typedArgVertex) Hashcode() interface{} {
-	return fmt.Sprintf("-> %s", v.Type.String())
+	return fmt.Sprintf("arg: %s", v.Type.String())
 }
 
 func (v *typedArgVertex) String() string { return v.Hashcode().(string) }
@@ -70,12 +70,11 @@ type typedOutputVertex struct {
 	Name string
 	Type reflect.Type
 
-	ValueName string
-	Value     reflect.Value
+	Value reflect.Value
 }
 
 func (v *typedOutputVertex) Hashcode() interface{} {
-	return fmt.Sprintf("<- %s", v.Type.String())
+	return fmt.Sprintf("out: %s", v.Type.String())
 }
 
 func (v *typedOutputVertex) String() string { return v.Hashcode().(string) }

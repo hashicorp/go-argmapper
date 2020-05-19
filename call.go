@@ -100,6 +100,21 @@ func (f *Func) Call(opts ...Arg) Result {
 		}), v, weightTyped)
 	}
 
+	// We need to allow any typed argument to depend on a typed output.
+	// This lets two converters chain together.
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*typedArgVertex)
+		if !ok {
+			continue
+		}
+
+		g.AddEdgeWeighted(v, g.Add(&typedOutputVertex{
+			Type: v.Type,
+		}), weightTyped)
+	}
+
+	log.Trace("full graph (may have cycles)", "graph", g.String())
+
 	// TODO: explain why
 	for _, raw := range g.Vertices() {
 		v, ok := raw.(*typedArgVertex)
@@ -147,9 +162,6 @@ func (f *Func) Call(opts ...Arg) Result {
 		return next()
 	})
 
-	// Output our full graph before we do any pruning
-	log.Trace("full graph", "graph", g.String())
-
 	// Remove all the non-visited vertices. After this, what we'll have
 	// is a graph that has many paths getting us from inputs to function,
 	// but we will have no spurious vertices that are unreachable from our
@@ -175,7 +187,7 @@ func (f *Func) Call(opts ...Arg) Result {
 		return resultError(err)
 	}
 
-	return f.call(state)
+	return f.call(log, state)
 }
 
 // reachTarget executes the the given convVertex by ensuring we satisfy
@@ -196,7 +208,7 @@ func (f *Func) reachTarget(
 		skip := false
 		switch v := out.(type) {
 		case *typedArgVertex:
-			skip = v.Value.Value.IsValid()
+			skip = v.Value.IsValid()
 		}
 
 		if !skip {
@@ -258,7 +270,7 @@ func (f *Func) reachTarget(
 			switch v := path[pathIdx].(type) {
 			case *valueVertex:
 				// Store the last viewed vertex in our path state
-				state.Value = v
+				state.Value = v.Value
 
 				if pathIdx > 0 {
 					prev := path[pathIdx-1]
@@ -276,14 +288,16 @@ func (f *Func) reachTarget(
 			case *typedArgVertex:
 				// The value of this is the last value vertex we saw. The graph
 				// walk should ensure this is the correct type.
-				v.Value = *state.Value
+				v.Value = state.Value
 
 				// Setup our mapping so that we know that this wildcard
 				// maps to this name.
-				state.Mapping[v.Name] = &v.Value
-				state.TypedValue[v.Type] = v.Value.Value
+				state.TypedValue[v.Type] = v.Value
 
 			case *typedOutputVertex:
+				// Last value
+				state.Value = v.Value
+
 				// Set the typed value we can read from.
 				state.TypedValue[v.Type] = v.Value
 
@@ -300,7 +314,7 @@ func (f *Func) reachTarget(
 				}
 
 				// Call our function.
-				result := v.Conv.call(state)
+				result := v.Conv.call(log, state)
 				if err := result.Err(); err != nil {
 					return err
 				}
@@ -327,7 +341,7 @@ func (f *Func) reachTarget(
 // call -- the unexported version of Call -- calls the function directly
 // with the given named arguments. This skips the whole graph creation
 // step by requiring args satisfy all required arguments.
-func (f *Func) call(state *callState) Result {
+func (f *Func) call(log hclog.Logger, state *callState) Result {
 	// Initialize the struct we'll be populating
 	var buildErr error
 	structVal := f.input.New()
@@ -360,7 +374,12 @@ func (f *Func) call(state *callState) Result {
 	}
 
 	// Call our function
-	out := f.fn.Call(structVal.CallIn())
+	in := structVal.CallIn()
+	for i, arg := range in {
+		log.Trace("argument", "idx", i, "value", arg.Interface())
+	}
+
+	out := f.fn.Call(in)
 	return Result{out: out}
 }
 
@@ -371,18 +390,16 @@ type callState struct {
 
 	// Value is the last seen value vertex. This state is preserved so
 	// we can set the typedVertex values properly.
-	Value *valueVertex
+	Value reflect.Value
 
 	// Typed holds the last seen typedVertex (source or destination
 	// since they share the same value).
-	Mapping    map[string]*valueVertex
 	TypedValue map[reflect.Type]reflect.Value
 }
 
 func newCallState() *callState {
 	return &callState{
 		Named:      map[string]reflect.Value{},
-		Mapping:    map[string]*valueVertex{},
 		TypedValue: map[reflect.Type]reflect.Value{},
 	}
 }
