@@ -167,13 +167,8 @@ func (t *structType) result(r Result) Result {
 	// If we are lifted, then we need to translate the output arguments
 	// to their proper types in a struct.
 	structOut := reflect.New(t.typ).Elem()
-	for i := 0; i < liftedNameMax; i++ {
-		f, ok := t.typedFields[liftedNameMap[i]]
-		if !ok {
-			break
-		}
-
-		structOut.Field(f.Index).Set(r.out[i])
+	for _, f := range t.typedFields {
+		structOut.Field(f.Index).Set(r.out[f.Index])
 	}
 
 	r.out = []reflect.Value{structOut}
@@ -218,14 +213,9 @@ func (v *structValue) CallIn() []reflect.Value {
 	}
 
 	// This is lifted, so we need to unpack them in order.
-	var result []reflect.Value
-	for i := 0; i < liftedNameMax; i++ {
-		f, ok := v.typ.typedFields[liftedNameMap[i]]
-		if !ok {
-			break
-		}
-
-		result = append(result, v.value.Field(f.Index))
+	result := make([]reflect.Value, len(v.typ.typedFields))
+	for _, f := range v.typ.typedFields {
+		result[f.Index] = v.value.Field(f.Index)
 	}
 
 	return result

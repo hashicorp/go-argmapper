@@ -104,24 +104,22 @@ func TestFunc(t *testing.T) {
 			"",
 		},
 
-		/*
-			{
-				"type converter with no struct",
-				func(in struct {
-					A string
-					B int
-				}) string {
-					return strings.Repeat(in.A, in.B)
-				},
-				[]Arg{
-					Named("a", 12),
-					Named("b", 2),
-					WithConvFunc(func(in int) string { return strconv.Itoa(in) }),
-				},
-				[]interface{}{"1212"},
-				"",
+		{
+			"type converter with no struct",
+			func(in struct {
+				A string
+				B int
+			}) string {
+				return strings.Repeat(in.A, in.B)
 			},
-		*/
+			[]Arg{
+				Named("a", 12),
+				Named("b", 2),
+				WithConvFunc(func(in int) string { return strconv.Itoa(in) }),
+			},
+			[]interface{}{"1212"},
+			"",
+		},
 
 		{
 			"generic type converter",
