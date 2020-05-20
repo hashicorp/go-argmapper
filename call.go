@@ -35,9 +35,9 @@ func (f *Func) Call(opts ...Arg) Result {
 	// requirements of the function. We keep track of this in vertexF and
 	// vertexT, respectively, because we'll need these later.
 	var g graph.Graph
-	vertexF := g.Add(&funcVertex{Func: f})                  // Function
-	vertexT := make([]graph.Vertex, 0, len(f.input.fields)) // Targets (function requirements)
-	for k, f := range f.input.fields {
+	vertexF := g.Add(&funcVertex{Func: f})                       // Function
+	vertexT := make([]graph.Vertex, 0, len(f.input.namedFields)) // Targets (function requirements)
+	for k, f := range f.input.namedFields {
 		// Add our target
 		target := g.Add(&valueVertex{
 			Name: k,
@@ -350,7 +350,7 @@ func (f *Func) call(log hclog.Logger, state *callState) Result {
 	// Initialize the struct we'll be populating
 	var buildErr error
 	structVal := f.input.New()
-	for k := range f.input.fields {
+	for k, f := range f.input.namedFields {
 		v, ok := state.Named[k]
 		if !ok {
 			buildErr = multierror.Append(buildErr, fmt.Errorf(
@@ -358,7 +358,7 @@ func (f *Func) call(log hclog.Logger, state *callState) Result {
 			continue
 		}
 
-		structVal.FieldNamed(k).Set(v)
+		structVal.Field(f.Index).Set(v)
 	}
 
 	for _, f := range f.input.typedFields {

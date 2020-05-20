@@ -41,7 +41,7 @@ import (
 // for logging.
 type Conv struct {
 	*Func
-	output *structType
+	output *valueSet
 }
 
 // NewConv constructs a new converter. See the docs on Conv for more info.
@@ -62,7 +62,7 @@ func NewConv(f interface{}) (*Conv, error) {
 		numOut -= 1
 	}
 
-	output, err := newStructType(numOut, ft.Out)
+	output, err := newValueSet(numOut, ft.Out)
 	if err != nil {
 		return nil, err
 	}
@@ -89,12 +89,12 @@ func (c *Conv) outputValues(r Result, vs []graph.Vertex, state *callState) {
 		case *valueVertex:
 			// Set the value on the vertex. During the graph walk, we'll
 			// set the Named value.
-			v.Value = structVal.Field(c.output.fields[v.Name].Index)
+			v.Value = structVal.Field(c.output.namedFields[v.Name].Index)
 
 		case *typedOutputVertex:
 			// Get our field with the same name
 			// TODO: this type String is nasty
-			field := c.output.typedFields[v.Type.String()]
+			field := c.output.typedFields[v.Type]
 			v.Value = structVal.Field(field.Index)
 		}
 	}
@@ -117,7 +117,7 @@ func (cs ConvSet) graph(g *graph.Graph, root graph.Vertex) {
 		}
 
 		// Add all our inputs and add an edge from the func to the input
-		for k, f := range conv.input.fields {
+		for k, f := range conv.input.namedFields {
 			g.AddEdge(vertex, g.Add(&valueVertex{
 				Name: k,
 				Type: f.Type,
@@ -130,7 +130,7 @@ func (cs ConvSet) graph(g *graph.Graph, root graph.Vertex) {
 		}
 
 		// Add all our outputs
-		for k, f := range conv.output.fields {
+		for k, f := range conv.output.namedFields {
 			g.AddEdge(g.Add(&valueVertex{
 				Name: k,
 				Type: f.Type,

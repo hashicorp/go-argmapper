@@ -7,7 +7,7 @@ import (
 
 type Func struct {
 	fn    reflect.Value
-	input *structType
+	input *valueSet
 }
 
 func NewFunc(f interface{}) (*Func, error) {
@@ -17,7 +17,7 @@ func NewFunc(f interface{}) (*Func, error) {
 		return nil, fmt.Errorf("fn should be a function, got %s", k)
 	}
 
-	structTyp, err := newStructType(ft.NumIn(), ft.In)
+	structTyp, err := newValueSet(ft.NumIn(), ft.In)
 	if err != nil {
 		return nil, err
 	}
