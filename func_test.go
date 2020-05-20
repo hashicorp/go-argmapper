@@ -87,23 +87,21 @@ func TestFunc(t *testing.T) {
 		//-----------------------------------------------------------
 		// TYPED INPUT - STRUCT
 
-		/*
-			{
-				"type only input",
-				func(in struct {
-					A int `argmapper:",typeOnly"`
-				}) int {
-					return in.A
-				},
-				[]Arg{
-					Named("b", 24),
-				},
-				[]interface{}{
-					24,
-				},
-				"",
+		{
+			"type only input",
+			func(in struct {
+				A int `argmapper:",typeOnly"`
+			}) int {
+				return in.A
 			},
-		*/
+			[]Arg{
+				Named("b", 24),
+			},
+			[]interface{}{
+				24,
+			},
+			"",
+		},
 
 		//-----------------------------------------------------------
 		// TYPE CONVERTER FUNCTIONS - NO STRUCT INPUTS

@@ -31,36 +31,22 @@ func (f *Func) Call(opts ...Arg) Result {
 		return resultError(buildErr)
 	}
 
-	log := builder.logger
-
-	// Build the graph. The first step is to add our function and all the
-	// requirements of the function. We keep track of this in vertexF and
-	// vertexT, respectively, because we'll need these later.
 	var g graph.Graph
-	vertexF := g.Add(&funcVertex{Func: f})                       // Function
-	vertexT := make([]graph.Vertex, 0, len(f.input.namedFields)) // Targets (function requirements)
-	for k, f := range f.input.namedFields {
-		// Add our target
-		target := g.Add(&valueVertex{
-			Name: k,
-			Type: f.Type,
-		})
-
-		// Connect the function to the target (function requires target)
-		g.AddEdge(vertexF, target)
-
-		// Track for later
-		vertexT = append(vertexT, target)
-	}
+	log := builder.logger
 
 	// Create a shared root. Anything reachable from the root is not pruned.
 	// This is primarily inputs but may also contain parameterless converters
 	// (providers).
-	vertexIRoot := g.Add(&rootVertex{})
+	vertexRoot := g.Add(&rootVertex{})
+
+	// Build the graph. The first step is to add our function and all the
+	// requirements of the function. We keep track of this in vertexF and
+	// vertexT, respectively, because we'll need these later.
+	vertexF := f.graph(&g, vertexRoot, false)
 
 	// If we have converters, add those. See ConvSet.graph for more details.
 	for _, f := range builder.convs {
-		f.graph(&g, vertexIRoot)
+		f.graph(&g, vertexRoot, true)
 	}
 
 	// Next, we add "inputs", which are the given named values that
@@ -75,7 +61,7 @@ func (f *Func) Call(opts ...Arg) Result {
 		})
 
 		// Input depends on the input root
-		g.AddEdge(input, vertexIRoot)
+		g.AddEdge(input, vertexRoot)
 
 		// Track
 		vertexI = append(vertexI, input)
@@ -159,7 +145,7 @@ func (f *Func) Call(opts ...Arg) Result {
 	// requirements, but we're going from requirements (inputs) to
 	// the function.
 	visited := map[interface{}]struct{}{graph.VertexID(vertexF): struct{}{}}
-	g.Reverse().DFS(vertexIRoot, func(v graph.Vertex, next func() error) error {
+	g.Reverse().DFS(vertexRoot, func(v graph.Vertex, next func() error) error {
 		if v == vertexF {
 			return nil
 		}

@@ -79,8 +79,13 @@ func NewFunc(f interface{}) (*Func, error) {
 }
 
 // graph adds this function to the graph. The given root should be a single
-// shared root to the graph, typically a rootVertex.
-func (f *Func) graph(g *graph.Graph, root graph.Vertex) {
+// shared root to the graph, typically a rootVertex. This returns the
+// funcVertex created.
+//
+// includeOutput controls whether to include the output values in the graph.
+// This should be true for all intermediary functions but false for the
+// target function.
+func (f *Func) graph(g *graph.Graph, root graph.Vertex, includeOutput bool) graph.Vertex {
 	vertex := g.Add(&funcVertex{
 		Func: f,
 	})
@@ -104,18 +109,22 @@ func (f *Func) graph(g *graph.Graph, root graph.Vertex) {
 		}), weightTyped)
 	}
 
-	// Add all our outputs
-	for k, f := range f.output.namedFields {
-		g.AddEdge(g.Add(&valueVertex{
-			Name: k,
-			Type: f.Type,
-		}), vertex)
+	if includeOutput {
+		// Add all our outputs
+		for k, f := range f.output.namedFields {
+			g.AddEdge(g.Add(&valueVertex{
+				Name: k,
+				Type: f.Type,
+			}), vertex)
+		}
+		for _, f := range f.output.typedFields {
+			g.AddEdgeWeighted(g.Add(&typedOutputVertex{
+				Type: f.Type,
+			}), vertex, weightTyped)
+		}
 	}
-	for _, f := range f.output.typedFields {
-		g.AddEdgeWeighted(g.Add(&typedOutputVertex{
-			Type: f.Type,
-		}), vertex, weightTyped)
-	}
+
+	return vertex
 }
 
 // outputValues extracts the output from the given Result. The Result must
