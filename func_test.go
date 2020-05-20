@@ -221,6 +221,21 @@ func TestFunc(t *testing.T) {
 		},
 
 		{
+			"multi-type providers",
+			func(in struct {
+				A int
+				B string
+			}) string {
+				return in.B + strconv.Itoa(in.A)
+			},
+			[]Arg{
+				WithConvFunc(func() (string, int) { return "yes: ", 12 }),
+			},
+			[]interface{}{"yes: 12"},
+			"",
+		},
+
+		{
 			"generic type converter",
 			func(in struct {
 				A string
