@@ -55,12 +55,14 @@ func NewConv(f interface{}) (*Conv, error) {
 	// Get our type
 	ft := fn.fn.Type()
 
-	// Validate output types.
-	if ft.NumOut() != 1 {
-		return nil, fmt.Errorf("function must return one or two results")
+	// Get our output parameters. If the last parameter is an error type
+	// then we don't parse that as the struct information.
+	numOut := ft.NumOut()
+	if numOut > 1 && ft.Out(numOut-1) == errType {
+		numOut -= 1
 	}
 
-	output, err := newStructType(ft.NumOut(), ft.Out)
+	output, err := newStructType(numOut, ft.Out)
 	if err != nil {
 		return nil, err
 	}

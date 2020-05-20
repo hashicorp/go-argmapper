@@ -1,6 +1,7 @@
 package argmapper
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -118,6 +119,40 @@ func TestFunc(t *testing.T) {
 				WithConvFunc(func(in int) string { return strconv.Itoa(in) }),
 			},
 			[]interface{}{"1212"},
+			"",
+		},
+
+		{
+			"type converter with an error",
+			func(in struct {
+				A string
+			}) string {
+				return in.A
+			},
+			[]Arg{
+				Named("a", 12),
+				WithConvFunc(func(in int) (string, error) {
+					return "", fmt.Errorf("failed")
+				}),
+			},
+			nil,
+			"failed",
+		},
+
+		{
+			"type converter with an error that succeeds",
+			func(in struct {
+				A string
+			}) string {
+				return in.A
+			},
+			[]Arg{
+				Named("a", 12),
+				WithConvFunc(func(in int) (string, error) {
+					return "YAY", nil
+				}),
+			},
+			[]interface{}{"YAY"},
 			"",
 		},
 

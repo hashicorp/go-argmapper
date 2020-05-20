@@ -25,8 +25,10 @@ func (r *Result) Err() error {
 
 	if len(r.out) > 0 {
 		final := r.out[len(r.out)-1]
-		if final.Type() == errType {
-			return final.Interface().(error)
+		if final.IsValid() && final.Type() == errType {
+			if err := final.Interface(); err != nil {
+				return err.(error)
+			}
 		}
 
 		return nil
