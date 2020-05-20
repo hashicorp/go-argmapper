@@ -42,6 +42,24 @@ func TestFunc(t *testing.T) {
 		},
 
 		{
+			"basic matching with types",
+			func(in struct {
+				Struct
+
+				A int
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				Typed(42),
+			},
+			[]interface{}{
+				42,
+			},
+			"",
+		},
+
+		{
 			"missing argument",
 			func(in struct {
 				Struct

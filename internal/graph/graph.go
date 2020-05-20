@@ -26,6 +26,21 @@ type Graph struct {
 func (g *Graph) Add(v Vertex) Vertex {
 	g.init()
 	h := hashcode(v)
+	if _, ok := g.adjacencyOut[h]; !ok {
+		g.adjacencyOut[h] = make(map[interface{}]int)
+		g.adjacencyIn[h] = make(map[interface{}]int)
+		g.hash[h] = v
+	}
+	return v
+}
+
+// AddOverwrite is the same as Add, except that even if the vertex
+// already exists with the same hashcode, the pointed to value is replaced
+// with the given v. This allows two Vertex values with the same hashcode
+// but different values to be replaced.
+func (g *Graph) AddOverwrite(v Vertex) Vertex {
+	g.init()
+	h := hashcode(v)
 	g.hash[h] = v
 	if _, ok := g.adjacencyOut[h]; !ok {
 		g.adjacencyOut[h] = make(map[interface{}]int)

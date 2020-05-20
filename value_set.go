@@ -58,7 +58,7 @@ func newValueSet(count int, get func(int) reflect.Type) (*valueSet, error) {
 	var sf []reflect.StructField
 	for i := 0; i < count; i++ {
 		sf = append(sf, reflect.StructField{
-			Name: fmt.Sprintf("A__Type_%d", i),
+			Name: fmt.Sprintf("V__Type_%d", i),
 			Type: get(i),
 
 			// TODO: won't work with multiple

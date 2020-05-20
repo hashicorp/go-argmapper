@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
 // Arg is an option to Func.Call that sets the state for the function call.
@@ -15,6 +16,7 @@ type Arg func(*argBuilder) error
 type argBuilder struct {
 	logger hclog.Logger
 	named  map[string]reflect.Value
+	typed  map[reflect.Type]reflect.Value
 	convs  []*Func
 }
 
@@ -24,6 +26,17 @@ type argBuilder struct {
 func Named(n string, v interface{}) Arg {
 	return func(a *argBuilder) error {
 		a.named[strings.ToLower(n)] = reflect.ValueOf(v)
+		return nil
+	}
+}
+
+// Typed specifies a typed argument with the given value. This will satisfy
+// any requirement where the type is assignable to a required value. The name
+// can be anything of the required value.
+func Typed(v interface{}) Arg {
+	return func(a *argBuilder) error {
+		rv := reflect.ValueOf(v)
+		a.typed[rv.Type()] = rv
 		return nil
 	}
 }
@@ -43,4 +56,41 @@ func WithConvFunc(fs ...interface{}) Arg {
 
 		return nil
 	}
+}
+
+func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
+	var result []graph.Vertex
+
+	// Add our named inputs
+	for k, v := range b.named {
+		// Add the input
+		input := g.AddOverwrite(&valueVertex{
+			Name:  k,
+			Type:  v.Type(),
+			Value: v,
+		})
+
+		// Input depends on the input root
+		g.AddEdge(input, root)
+
+		// Track
+		result = append(result, input)
+	}
+
+	// Add our typed inputs
+	for t, v := range b.typed {
+		// Add the input
+		input := g.AddOverwrite(&typedOutputVertex{
+			Type:  t,
+			Value: v,
+		})
+
+		// Input depends on the input root
+		g.AddEdge(input, root)
+
+		// Track
+		result = append(result, input)
+	}
+
+	return result
 }

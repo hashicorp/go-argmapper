@@ -19,6 +19,7 @@ func (f *Func) Call(opts ...Arg) Result {
 	builder := &argBuilder{
 		logger: hclog.L(),
 		named:  make(map[string]reflect.Value),
+		typed:  make(map[reflect.Type]reflect.Value),
 	}
 	for _, opt := range opts {
 		if err := opt(builder); err != nil {
@@ -51,21 +52,7 @@ func (f *Func) Call(opts ...Arg) Result {
 
 	// Next, we add "inputs", which are the given named values that
 	// we already know about. These are tracked as "vertexI".
-	vertexI := make([]graph.Vertex, 0, len(builder.named))
-	for k, v := range builder.named {
-		// Add the input
-		input := g.Add(&valueVertex{
-			Name:  k,
-			Type:  v.Type(),
-			Value: v,
-		})
-
-		// Input depends on the input root
-		g.AddEdge(input, vertexRoot)
-
-		// Track
-		vertexI = append(vertexI, input)
-	}
+	vertexI := builder.graph(&g, vertexRoot)
 
 	// Next, for all values we may have or produce, we need to create
 	// the vertices for the type-only value. This lets us say, for example,
