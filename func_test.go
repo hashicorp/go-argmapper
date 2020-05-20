@@ -110,6 +110,25 @@ func TestFunc(t *testing.T) {
 			"",
 		},
 
+		{
+			"typed and named prefers named",
+			func(in struct {
+				Struct
+
+				A int
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				Named("a", 12),
+				Typed(42),
+			},
+			[]interface{}{
+				12,
+			},
+			"",
+		},
+
 		/*
 			{
 				"struct with primitive",
