@@ -56,10 +56,12 @@ func (f *Func) Call(opts ...Arg) Result {
 	// Create a shared root. Anything reachable from the root is not pruned.
 	// This is primarily inputs but may also contain parameterless converters
 	// (providers).
-	vertexIRoot := g.Add(&inputRootVertex{})
+	vertexIRoot := g.Add(&rootVertex{})
 
 	// If we have converters, add those. See ConvSet.graph for more details.
-	ConvSet(builder.convs).graph(&g, vertexIRoot)
+	for _, f := range builder.convs {
+		f.graph(&g, vertexIRoot)
+	}
 
 	// Next, we add "inputs", which are the given named values that
 	// we already know about. These are tracked as "vertexI".
@@ -194,7 +196,7 @@ func (f *Func) Call(opts ...Arg) Result {
 	return f.callDirect(log, state)
 }
 
-// reachTarget executes the the given convVertex by ensuring we satisfy
+// reachTarget executes the the given funcVertex by ensuring we satisfy
 // all the inbound arguments first and then calling it.
 func (f *Func) reachTarget(
 	log hclog.Logger,
@@ -272,7 +274,7 @@ func (f *Func) reachTarget(
 			log.Trace("executing node")
 
 			switch v := path[pathIdx].(type) {
-			case *inputRootVertex:
+			case *rootVertex:
 				// Do nothing
 
 			case *valueVertex:
@@ -308,7 +310,7 @@ func (f *Func) reachTarget(
 				// Set the typed value we can read from.
 				state.TypedValue[v.Type] = v.Value
 
-			case *convVertex:
+			case *funcVertex:
 				// Reach our arguments if they aren't already.
 				if err := f.reachTarget(
 					log.Named(graph.VertexName(v)),
@@ -321,13 +323,13 @@ func (f *Func) reachTarget(
 				}
 
 				// Call our function.
-				result := v.Conv.callDirect(log, state)
+				result := v.Func.callDirect(log, state)
 				if err := result.Err(); err != nil {
 					return err
 				}
 
 				// Update our graph nodes and continue
-				v.Conv.outputValues(result, g.InEdges(v), state)
+				v.Func.outputValues(result, g.InEdges(v), state)
 
 			default:
 				panic(fmt.Sprintf("unknown vertex: %v", v))

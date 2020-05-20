@@ -15,7 +15,7 @@ type Arg func(*argBuilder) error
 type argBuilder struct {
 	logger hclog.Logger
 	named  map[string]reflect.Value
-	convs  []*Conv
+	convs  []*Func
 }
 
 // Named specifies a named argument with the given value. This will satisfy
@@ -33,7 +33,7 @@ func Named(n string, v interface{}) Arg {
 func WithConvFunc(fs ...interface{}) Arg {
 	return func(a *argBuilder) error {
 		for _, f := range fs {
-			conv, err := NewConv(f)
+			conv, err := NewFunc(f)
 			if err != nil {
 				return err
 			}

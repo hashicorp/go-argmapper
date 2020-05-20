@@ -84,26 +84,29 @@ func TestFunc(t *testing.T) {
 			"",
 		},
 
-		{
-			"direct named converter",
-			func(in struct {
-				A string
-			}) string {
-				return in.A + "!"
+		//-----------------------------------------------------------
+		// TYPED INPUT - STRUCT
+
+		/*
+			{
+				"type only input",
+				func(in struct {
+					A int `argmapper:",typeOnly"`
+				}) int {
+					return in.A
+				},
+				[]Arg{
+					Named("b", 24),
+				},
+				[]interface{}{
+					24,
+				},
+				"",
 			},
-			[]Arg{
-				Named("a", 12),
-				WithConvFunc(func(s struct {
-					A int
-				}) struct {
-					A string
-				} {
-					return struct{ A string }{strconv.Itoa(s.A)}
-				}),
-			},
-			[]interface{}{"12!"},
-			"",
-		},
+		*/
+
+		//-----------------------------------------------------------
+		// TYPE CONVERTER FUNCTIONS - NO STRUCT INPUTS
 
 		{
 			"type converter with no struct",
@@ -232,6 +235,30 @@ func TestFunc(t *testing.T) {
 				WithConvFunc(func() (string, int) { return "yes: ", 12 }),
 			},
 			[]interface{}{"yes: 12"},
+			"",
+		},
+
+		//-----------------------------------------------------------
+		// TYPE CONVERTER STRUCTS
+
+		{
+			"direct named converter",
+			func(in struct {
+				A string
+			}) string {
+				return in.A + "!"
+			},
+			[]Arg{
+				Named("a", 12),
+				WithConvFunc(func(s struct {
+					A int
+				}) struct {
+					A string
+				} {
+					return struct{ A string }{strconv.Itoa(s.A)}
+				}),
+			},
+			[]interface{}{"12!"},
 			"",
 		},
 

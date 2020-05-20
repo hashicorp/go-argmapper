@@ -8,6 +8,9 @@ import (
 )
 
 const (
+	// weightNormal is the typcal edge weight.
+	weightNormal = 1
+
 	// weightTyped is the weight to use for edges that connected to any
 	// type-only vertex. We weigh these heavier since we prefer valued vertices.
 	weightTyped = 5
@@ -30,14 +33,6 @@ type valueVertex struct {
 func (v *valueVertex) Hashcode() interface{} {
 	return fmt.Sprintf("%s/%s", v.Name, v.Type.String())
 }
-
-// convVertex represents an available converter.
-type convVertex struct {
-	Conv *Conv
-}
-
-func (v *convVertex) Hashcode() interface{} { return v.Conv }
-func (v *convVertex) String() string        { return "conv: " + v.Conv.fn.String() }
 
 // funcVertex is our target function. There is only ever one of these
 // in the graph.
@@ -79,14 +74,13 @@ func (v *typedOutputVertex) Hashcode() interface{} {
 
 func (v *typedOutputVertex) String() string { return v.Hashcode().(string) }
 
-// inputRootVertex tracks the root of a function call. This should have
+// rootVertex tracks the root of a function call. This should have
 // in-edges only from the inputs. We use this to get a single root.
-type inputRootVertex struct{}
+type rootVertex struct{}
 
-func (v *inputRootVertex) String() string { return "root" }
+func (v *rootVertex) String() string { return "root" }
 
 var (
-	_ graph.VertexHashable = (*convVertex)(nil)
 	_ graph.VertexHashable = (*funcVertex)(nil)
 	_ graph.VertexHashable = (*valueVertex)(nil)
 )
