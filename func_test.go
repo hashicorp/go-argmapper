@@ -104,6 +104,21 @@ func TestFunc(t *testing.T) {
 		},
 
 		//-----------------------------------------------------------
+		// TYPED INPUT - NON-STRUCT
+
+		{
+			"type only input non struct",
+			func(v int) int { return v },
+			[]Arg{
+				Named("b", 24),
+			},
+			[]interface{}{
+				24,
+			},
+			"",
+		},
+
+		//-----------------------------------------------------------
 		// TYPE CONVERTER FUNCTIONS - NO STRUCT INPUTS
 
 		{
