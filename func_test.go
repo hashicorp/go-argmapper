@@ -170,6 +170,22 @@ func TestFunc(t *testing.T) {
 		},
 
 		{
+			"only providers",
+			func(in struct {
+				A int
+				B string
+			}) string {
+				return in.B + strconv.Itoa(in.A)
+			},
+			[]Arg{
+				WithConvFunc(func() string { return "yes: " }),
+				WithConvFunc(func() int { return 12 }),
+			},
+			[]interface{}{"yes: 12"},
+			"",
+		},
+
+		{
 			"generic type converter",
 			func(in struct {
 				A string
