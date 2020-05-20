@@ -49,8 +49,7 @@ func newValueSet(count int, get func(int) reflect.Type) (*valueSet, error) {
 	// If we have exactly one argument, let's check if its a struct. If
 	// it is then we treat it as the full value.
 	if count == 1 {
-		t := get(0)
-		if t.Kind() == reflect.Struct {
+		if t := get(0); isStruct(t) {
 			return newValueSetFromStruct(t)
 		}
 	}
@@ -93,8 +92,8 @@ func newValueSetFromStruct(typ reflect.Type) (*valueSet, error) {
 	for i := 0; i < typ.NumField(); i++ {
 		sf := typ.Field(i)
 
-		// Ignore unexported fields
-		if sf.PkgPath != "" {
+		// Ignore unexported fields and our struct marker
+		if sf.PkgPath != "" || isStructField(sf) {
 			continue
 		}
 

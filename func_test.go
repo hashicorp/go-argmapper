@@ -25,6 +25,8 @@ func TestFunc(t *testing.T) {
 		{
 			"basic matching",
 			func(in struct {
+				Struct
+
 				A, B int
 			}) int {
 				return in.A + in.B
@@ -42,6 +44,8 @@ func TestFunc(t *testing.T) {
 		{
 			"missing argument",
 			func(in struct {
+				Struct
+
 				A, B int
 			}) int {
 				return in.A + in.B
@@ -56,6 +60,8 @@ func TestFunc(t *testing.T) {
 		{
 			"unexported field ignored",
 			func(in struct {
+				Struct
+
 				A int
 				b int
 			}) int {
@@ -69,6 +75,8 @@ func TestFunc(t *testing.T) {
 		{
 			"renamed field",
 			func(in struct {
+				Struct
+
 				A int `argmapper:"C"`
 				B int
 			}) int {
@@ -90,6 +98,8 @@ func TestFunc(t *testing.T) {
 		{
 			"type only input",
 			func(in struct {
+				Struct
+
 				A int `argmapper:",typeOnly"`
 			}) int {
 				return in.A
@@ -124,6 +134,8 @@ func TestFunc(t *testing.T) {
 		{
 			"type converter with no struct",
 			func(in struct {
+				Struct
+
 				A string
 				B int
 			}) string {
@@ -141,6 +153,8 @@ func TestFunc(t *testing.T) {
 		{
 			"type converter with an error",
 			func(in struct {
+				Struct
+
 				A string
 			}) string {
 				return in.A
@@ -158,6 +172,8 @@ func TestFunc(t *testing.T) {
 		{
 			"type converter with an error that succeeds",
 			func(in struct {
+				Struct
+
 				A string
 			}) string {
 				return in.A
@@ -175,6 +191,8 @@ func TestFunc(t *testing.T) {
 		{
 			"multiple input converter with no struct",
 			func(in struct {
+				Struct
+
 				A int
 			}) string {
 				return strconv.Itoa(in.A)
@@ -191,6 +209,8 @@ func TestFunc(t *testing.T) {
 		{
 			"chained converters",
 			func(in struct {
+				Struct
+
 				A int
 			}) string {
 				return strconv.Itoa(in.A)
@@ -207,6 +227,8 @@ func TestFunc(t *testing.T) {
 		{
 			"no argument converter",
 			func(in struct {
+				Struct
+
 				A int
 				B string
 			}) string {
@@ -223,6 +245,8 @@ func TestFunc(t *testing.T) {
 		{
 			"only providers",
 			func(in struct {
+				Struct
+
 				A int
 				B string
 			}) string {
@@ -239,6 +263,8 @@ func TestFunc(t *testing.T) {
 		{
 			"multi-type providers",
 			func(in struct {
+				Struct
+
 				A int
 				B string
 			}) string {
@@ -257,6 +283,8 @@ func TestFunc(t *testing.T) {
 		{
 			"direct named converter",
 			func(in struct {
+				Struct
+
 				A string
 			}) string {
 				return in.A + "!"
@@ -264,11 +292,19 @@ func TestFunc(t *testing.T) {
 			[]Arg{
 				Named("a", 12),
 				WithConvFunc(func(s struct {
+					Struct
+
 					A int
 				}) struct {
+					Struct
+
 					A string
 				} {
-					return struct{ A string }{strconv.Itoa(s.A)}
+					return struct {
+						Struct
+
+						A string
+					}{A: strconv.Itoa(s.A)}
 				}),
 			},
 			[]interface{}{"12!"},
@@ -278,6 +314,8 @@ func TestFunc(t *testing.T) {
 		{
 			"generic type converter",
 			func(in struct {
+				Struct
+
 				A string
 				B int
 			}) string {
@@ -287,31 +325,40 @@ func TestFunc(t *testing.T) {
 				Named("a", 12),
 				Named("b", 2),
 				WithConvFunc(func(s struct {
+					Struct
 					C string
 				}) struct {
+					Struct
 					A string
 				} {
 					return struct {
+						Struct
 						A string
-					}{"FOO"}
+					}{A: "FOO"}
 				}),
 				WithConvFunc(func(s struct {
+					Struct
 					C bool
 				}) struct {
+					Struct
 					A string
 				} {
 					return struct {
+						Struct
 						A string
-					}{"FOO"}
+					}{A: "FOO"}
 				}),
 				WithConvFunc(func(s struct {
+					Struct
 					B int `argmapper:",typeOnly"`
 				}) struct {
+					Struct
 					B string `argmapper:",typeOnly"`
 				} {
 					return struct {
+						Struct
 						B string `argmapper:",typeOnly"`
-					}{strconv.Itoa(s.B)}
+					}{B: strconv.Itoa(s.B)}
 				}),
 			},
 			[]interface{}{"1212"},
@@ -321,6 +368,7 @@ func TestFunc(t *testing.T) {
 		{
 			"type converter with multiple typeOnly fields",
 			func(in struct {
+				Struct
 				A string
 				B int
 			}) string {
@@ -330,16 +378,19 @@ func TestFunc(t *testing.T) {
 				Named("a", 12),
 				Named("b", "AB"),
 				WithConvFunc(func(s struct {
+					Struct
 					C string `argmapper:",typeOnly"`
 					D int    `argmapper:",typeOnly"`
 				}) struct {
+					Struct
 					C int    `argmapper:",typeOnly"`
 					D string `argmapper:",typeOnly"`
 				} {
 					return struct {
+						Struct
 						C int    `argmapper:",typeOnly"`
 						D string `argmapper:",typeOnly"`
-					}{len(s.C), strconv.Itoa(s.D)}
+					}{C: len(s.C), D: strconv.Itoa(s.D)}
 				}),
 			},
 			[]interface{}{"1212"},
