@@ -101,12 +101,18 @@ func (c *Conv) outputValues(r Result, vs []graph.Vertex, state *callState) {
 // ConvSet is a set of converters.
 type ConvSet []*Conv
 
-func (cs ConvSet) graph(g *graph.Graph) {
+func (cs ConvSet) graph(g *graph.Graph, root graph.Vertex) {
 	// Go through all our convs and create the vertices for our inputs and outputs
 	for _, conv := range cs {
 		vertex := g.Add(&convVertex{
 			Conv: conv,
 		})
+
+		// If we take no arguments, we add this function to the root
+		// so that it isn't pruned.
+		if conv.input.empty() {
+			g.AddEdge(vertex, root)
+		}
 
 		// Add all our inputs and add an edge from the func to the input
 		for k, f := range conv.input.fields {
@@ -118,7 +124,7 @@ func (cs ConvSet) graph(g *graph.Graph) {
 		for _, f := range conv.input.typedFields {
 			g.AddEdgeWeighted(vertex, g.Add(&typedArgVertex{
 				Type: f.Type,
-			}), 50)
+			}), weightTyped)
 		}
 
 		// Add all our outputs
@@ -131,7 +137,7 @@ func (cs ConvSet) graph(g *graph.Graph) {
 		for _, f := range conv.output.typedFields {
 			g.AddEdgeWeighted(g.Add(&typedOutputVertex{
 				Type: f.Type,
-			}), vertex, 50)
+			}), vertex, weightTyped)
 		}
 	}
 }

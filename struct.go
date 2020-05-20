@@ -42,7 +42,7 @@ func newStructType(count int, get func(int) reflect.Type) (*structType, error) {
 	// to accept zero argument functions but there are a lot of assumptions
 	// we haven't resolved yet. This shouldn't be too difficult to support.
 	if count == 0 {
-		return nil, fmt.Errorf("function must take at least one argument")
+		return &structType{}, nil
 	}
 
 	// If we have exactly one argument, let's check if its a struct. If
@@ -145,15 +145,21 @@ func newStructTypeFromStruct(typ reflect.Type) (*structType, error) {
 
 // New returns a new structValue that can be used for value population.
 func (t *structType) New() *structValue {
-	return &structValue{
-		typ:   t,
-		value: reflect.New(t.typ).Elem(),
+	result := &structValue{typ: t}
+	if t.typ != nil {
+		result.value = reflect.New(t.typ).Elem()
 	}
+
+	return result
 }
 
 // lifted returns true if this field is lifted.
 func (t *structType) lifted() bool {
 	return t.isLifted
+}
+
+func (t *structType) empty() bool {
+	return t.typ == nil
 }
 
 // result takes the result that matches this struct type and adapts it
@@ -207,6 +213,11 @@ func (v *structValue) Field(idx int) reflect.Value {
 }
 
 func (v *structValue) CallIn() []reflect.Value {
+	// If typ is nil then there is no inputs
+	if v.typ.typ == nil {
+		return nil
+	}
+
 	// If this is not lifted, return it as-is.
 	if !v.typ.lifted() {
 		return []reflect.Value{v.value}

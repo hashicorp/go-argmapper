@@ -189,8 +189,9 @@ func (g *Graph) String() string {
 
 		// Alphabetize dependencies
 		deps := make([]string, 0, len(targets))
-		for targetHash := range targets {
-			deps = append(deps, VertexName(g.hash[targetHash]))
+		for targetHash, weight := range targets {
+			deps = append(deps, fmt.Sprintf(
+				"%s (%d)", VertexName(g.hash[targetHash]), weight))
 		}
 		sort.Strings(deps)
 

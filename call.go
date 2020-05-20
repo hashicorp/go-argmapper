@@ -51,14 +51,16 @@ func (f *Func) Call(opts ...Arg) Result {
 		vertexT = append(vertexT, target)
 	}
 
+	// Create a shared root. Anything reachable from the root is not pruned.
+	// This is primarily inputs but may also contain parameterless converters
+	// (providers).
+	vertexIRoot := g.Add(&inputRootVertex{})
+
 	// If we have converters, add those. See ConvSet.graph for more details.
-	ConvSet(builder.convs).graph(&g)
+	ConvSet(builder.convs).graph(&g, vertexIRoot)
 
 	// Next, we add "inputs", which are the given named values that
-	// we already know about. These are tracked as "vertexI". We also
-	// create a shared "input root" tracked as "vertexIRoot". The shared
-	// input root lets us have a single root entrypoint for the graph.
-	vertexIRoot := g.Add(&inputRootVertex{})
+	// we already know about. These are tracked as "vertexI".
 	vertexI := make([]graph.Vertex, 0, len(builder.named))
 	for k, v := range builder.named {
 		// Add the input
@@ -268,6 +270,9 @@ func (f *Func) reachTarget(
 			log.Trace("executing node")
 
 			switch v := path[pathIdx].(type) {
+			case *inputRootVertex:
+				// Do nothing
+
 			case *valueVertex:
 				// Store the last viewed vertex in our path state
 				state.Value = v.Value

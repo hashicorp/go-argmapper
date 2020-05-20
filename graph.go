@@ -10,7 +10,7 @@ import (
 const (
 	// weightTyped is the weight to use for edges that connected to any
 	// type-only vertex. We weigh these heavier since we prefer valued vertices.
-	weightTyped = 10
+	weightTyped = 5
 
 	// weightMatchingName is the weight to use for the edges to any value
 	// vertex with a matching name. This has the effect of preferring edges
