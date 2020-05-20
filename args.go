@@ -7,6 +7,9 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+// Arg is an option to Func.Call that sets the state for the function call.
+// This can be a direct named arg or a converter that could be used if
+// necessary to reach the target.
 type Arg func(*argBuilder) error
 
 type argBuilder struct {

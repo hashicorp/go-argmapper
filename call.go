@@ -9,6 +9,8 @@ import (
 	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
+// Call calls the function. Use the various Arg functions to set the state
+// for the function call.
 func (f *Func) Call(opts ...Arg) Result {
 	// buildErr accumulates any errors that we return at various checkpoints
 	var buildErr error
@@ -189,7 +191,7 @@ func (f *Func) Call(opts ...Arg) Result {
 		return resultError(err)
 	}
 
-	return f.call(log, state)
+	return f.callDirect(log, state)
 }
 
 // reachTarget executes the the given convVertex by ensuring we satisfy
@@ -287,7 +289,7 @@ func (f *Func) reachTarget(
 
 				// If we have a valid value set, then put it on our named list.
 				if v.Value.IsValid() {
-					state.Named[v.Name] = v.Value
+					state.NamedValue[v.Name] = v.Value
 				}
 
 			case *typedArgVertex:
@@ -319,7 +321,7 @@ func (f *Func) reachTarget(
 				}
 
 				// Call our function.
-				result := v.Conv.call(log, state)
+				result := v.Conv.callDirect(log, state)
 				if err := result.Err(); err != nil {
 					return err
 				}
@@ -346,12 +348,12 @@ func (f *Func) reachTarget(
 // call -- the unexported version of Call -- calls the function directly
 // with the given named arguments. This skips the whole graph creation
 // step by requiring args satisfy all required arguments.
-func (f *Func) call(log hclog.Logger, state *callState) Result {
+func (f *Func) callDirect(log hclog.Logger, state *callState) Result {
 	// Initialize the struct we'll be populating
 	var buildErr error
 	structVal := f.input.New()
 	for k, f := range f.input.namedFields {
-		v, ok := state.Named[k]
+		v, ok := state.NamedValue[k]
 		if !ok {
 			buildErr = multierror.Append(buildErr, fmt.Errorf(
 				"argument cannot be satisfied: %s", k))
@@ -388,30 +390,22 @@ func (f *Func) call(log hclog.Logger, state *callState) Result {
 	return Result{out: out}
 }
 
+// callState is the shared state for the execution of a single call.
 type callState struct {
-	Named map[string]reflect.Value
+	// NamedValue holds the current table of known named values.
+	NamedValue map[string]reflect.Value
 
-	Result Result
+	// TypedValue holds the current table of assigned typed values.
+	TypedValue map[reflect.Type]reflect.Value
 
 	// Value is the last seen value vertex. This state is preserved so
 	// we can set the typedVertex values properly.
 	Value reflect.Value
-
-	// Typed holds the last seen typedVertex (source or destination
-	// since they share the same value).
-	TypedValue map[reflect.Type]reflect.Value
 }
 
 func newCallState() *callState {
 	return &callState{
-		Named:      map[string]reflect.Value{},
+		NamedValue: map[string]reflect.Value{},
 		TypedValue: map[reflect.Type]reflect.Value{},
 	}
-}
-
-type pathState struct {
-	*callState
-
-	// Result is the result from the last call.
-	Result Result
 }
