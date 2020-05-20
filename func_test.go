@@ -92,6 +92,45 @@ func TestFunc(t *testing.T) {
 			"",
 		},
 
+		/*
+			{
+				"struct with primitive",
+				func(in struct {
+					Struct
+
+					A, B int
+				}, prefix string) string {
+					return prefix + strconv.Itoa(in.A+in.B)
+				},
+				[]Arg{
+					Named("a", 12),
+					Named("b", 24),
+					Named("c", "key: "),
+				},
+				[]interface{}{
+					"key: 36",
+				},
+				"",
+			},
+		*/
+
+		{
+			"full struct matching",
+			func(in struct {
+				A int
+				B int
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				Named("a", struct{ A, B int }{A: 12, B: 24}),
+			},
+			[]interface{}{
+				36,
+			},
+			"",
+		},
+
 		//-----------------------------------------------------------
 		// TYPED INPUT - STRUCT
 
