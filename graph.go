@@ -83,4 +83,6 @@ func (v *rootVertex) String() string { return "root" }
 var (
 	_ graph.VertexHashable = (*funcVertex)(nil)
 	_ graph.VertexHashable = (*valueVertex)(nil)
+	_ graph.VertexHashable = (*typedArgVertex)(nil)
+	_ graph.VertexHashable = (*typedOutputVertex)(nil)
 )
