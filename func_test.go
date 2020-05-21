@@ -130,6 +130,7 @@ func TestFunc(t *testing.T) {
 		},
 
 		/*
+			TODO we don't support this yet
 			{
 				"struct with primitive",
 				func(in struct {
