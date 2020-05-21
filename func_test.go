@@ -129,29 +129,6 @@ func TestFunc(t *testing.T) {
 			"",
 		},
 
-		/*
-			TODO we don't support this yet
-			{
-				"struct with primitive",
-				func(in struct {
-					Struct
-
-					A, B int
-				}, prefix string) string {
-					return prefix + strconv.Itoa(in.A+in.B)
-				},
-				[]Arg{
-					Named("a", 12),
-					Named("b", 24),
-					Named("c", "key: "),
-				},
-				[]interface{}{
-					"key: 36",
-				},
-				"",
-			},
-		*/
-
 		{
 			"full struct matching",
 			func(in struct {
