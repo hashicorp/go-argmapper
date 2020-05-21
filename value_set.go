@@ -57,12 +57,15 @@ func newValueSet(count int, get func(int) reflect.Type) (*valueSet, error) {
 	// We need to lift the arguments into a "struct".
 	var sf []reflect.StructField
 	for i := 0; i < count; i++ {
+		t := get(i)
+		if isStruct(t) {
+			return nil, fmt.Errorf("can't mix argmapper.Struct and non-struct values")
+		}
+
 		sf = append(sf, reflect.StructField{
 			Name: fmt.Sprintf("V__Type_%d", i),
-			Type: get(i),
-
-			// TODO: won't work with multiple
-			Tag: reflect.StructTag(`argmapper:",typeOnly"`),
+			Type: t,
+			Tag:  reflect.StructTag(`argmapper:",typeOnly"`),
 		})
 	}
 
