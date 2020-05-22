@@ -18,6 +18,7 @@ func TestFuncRedefine(t *testing.T) {
 		Name       string
 		Func       interface{}
 		Args       []Arg
+		Err        string
 		CallArgs   []Arg
 		CallResult []interface{}
 	}{
@@ -34,6 +35,7 @@ func TestFuncRedefine(t *testing.T) {
 				Named("a", 12),
 				Named("b", 24),
 			},
+			"",
 			[]Arg{},
 			[]interface{}{36},
 		},
@@ -50,6 +52,7 @@ func TestFuncRedefine(t *testing.T) {
 			[]Arg{
 				Named("a", 12),
 			},
+			"",
 			[]Arg{
 				Named("b", 24),
 			},
@@ -70,10 +73,29 @@ func TestFuncRedefine(t *testing.T) {
 				WithConvFunc(func(v string) (int, error) { return strconv.Atoi(v) }),
 				Filter(func(t reflect.Type) bool { return t.Kind() == reflect.String }),
 			},
+			"",
 			[]Arg{
 				Typed("24"),
 			},
 			[]interface{}{36},
+		},
+
+		{
+			"unsatisfiable",
+			func(in struct {
+				Struct
+
+				A, B int
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				Named("a", 12),
+				Filter(func(t reflect.Type) bool { return t.Kind() == reflect.String }),
+			},
+			`cannot be satisfied: "b"`,
+			[]Arg{},
+			nil,
 		},
 	}
 
@@ -85,7 +107,13 @@ func TestFuncRedefine(t *testing.T) {
 			require.NoError(err)
 
 			redefined, err := f.Redefine(tt.Args...)
-			require.NoError(err)
+			if tt.Err == "" {
+				require.NoError(err)
+			} else {
+				require.Error(err)
+				require.Contains(err.Error(), tt.Err)
+				return
+			}
 
 			result := redefined.Call(tt.CallArgs...)
 			require.NoError(result.Err())

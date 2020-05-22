@@ -75,7 +75,8 @@ func (g *Graph) Remove(v Vertex) Vertex {
 }
 
 // Vertex returns the vertex by id. This can be done to get the node that
-// is actually in the graph.
+// is actually in the graph. This will return nil if the given vertex
+// is not in the graph any longer.
 func (g *Graph) Vertex(id interface{}) Vertex {
 	g.init()
 	return g.hash[id]

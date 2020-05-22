@@ -28,7 +28,10 @@ func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 	log := builder.logger
 
 	// Get our call graph
-	g, _, vertexF, vertexI := f.callGraph(builder)
+	g, _, vertexF, vertexI, err := f.callGraph(builder)
+	if err != nil {
+		return nil, err
+	}
 
 	// We go through the call graph and modify the functions to be no-ops
 	// that just set the output values to zero values. This will let our

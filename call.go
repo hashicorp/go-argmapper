@@ -14,6 +14,7 @@ func (f *Func) callGraph(args *argBuilder) (
 	vertexRoot graph.Vertex,
 	vertexF graph.Vertex,
 	vertexI []graph.Vertex,
+	err error,
 ) {
 	log := args.logger
 
@@ -26,6 +27,7 @@ func (f *Func) callGraph(args *argBuilder) (
 	// requirements of the function. We keep track of this in vertexF and
 	// vertexT, respectively, because we'll need these later.
 	vertexF = f.graph(&g, vertexRoot, false)
+	vertexFreq := g.OutEdges(vertexF)
 
 	// Next, we add "inputs", which are the given named values that
 	// we already know about. These are tracked as "vertexI".
@@ -170,6 +172,26 @@ func (f *Func) callGraph(args *argBuilder) (
 		}
 	}
 	log.Trace("graph after input DFS", "graph", g.String())
+
+	// Go through all our inputs. If any aren't in the graph any longer
+	// it means there is no possible path to that input so it cannot be
+	// satisfied.
+	err = nil
+	for _, req := range vertexFreq {
+		if g.Vertex(graph.VertexID(req)) == nil {
+			name := graph.VertexName(req)
+			switch v := req.(type) {
+			case *valueVertex:
+				name = fmt.Sprintf("%q of type %s", v.Name, v.Type.String())
+
+			case *typedArgVertex:
+				name = fmt.Sprintf("type %s", v.Type.String())
+			}
+
+			err = multierror.Append(err, fmt.Errorf(
+				"cannot be satisfied: %s", name))
+		}
+	}
 
 	return
 }
