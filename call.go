@@ -9,25 +9,176 @@ import (
 	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
-// Call calls the function. Use the various Arg functions to set the state
-// for the function call.
-func (f *Func) Call(opts ...Arg) Result {
-	// buildErr accumulates any errors that we return at various checkpoints
-	var buildErr error
+func (f *Func) callGraph(args *argBuilder) (
+	g graph.Graph,
+	vertexRoot graph.Vertex,
+	vertexF graph.Vertex,
+	vertexI []graph.Vertex,
+) {
+	log := args.logger
 
-	// Build up our args
-	builder := &argBuilder{
-		logger: hclog.L(),
-		named:  make(map[string]reflect.Value),
-		typed:  make(map[reflect.Type]reflect.Value),
+	// Create a shared root. Anything reachable from the root is not pruned.
+	// This is primarily inputs but may also contain parameterless converters
+	// (providers).
+	vertexRoot = g.Add(&rootVertex{})
+
+	// Build the graph. The first step is to add our function and all the
+	// requirements of the function. We keep track of this in vertexF and
+	// vertexT, respectively, because we'll need these later.
+	vertexF = f.graph(&g, vertexRoot, false)
+
+	// Next, we add "inputs", which are the given named values that
+	// we already know about. These are tracked as "vertexI".
+	vertexI = args.graph(&g, vertexRoot)
+
+	// Next, for all values we may have or produce, we need to create
+	// the vertices for the type-only value. This lets us say, for example,
+	// that an input "A string" satisfies anything that requires only "string".
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*valueVertex)
+		if !ok {
+			continue
+		}
+
+		// We only add an edge from the output if we require a value.
+		// If we already have a value then we don't need to request one.
+		if !v.Value.IsValid() {
+			g.AddEdgeWeighted(v, g.Add(&typedOutputVertex{
+				Type: v.Type,
+			}), weightTyped)
+		}
+
+		// We always add an edge from the arg to the value, whether it
+		// has one or not. In the next step, we'll prune any typed arguments
+		// that already have a satisfied value.
+		g.AddEdgeWeighted(g.Add(&typedArgVertex{
+			Type: v.Type,
+		}), v, weightTyped)
 	}
-	for _, opt := range opts {
-		if err := opt(builder); err != nil {
-			buildErr = multierror.Append(buildErr, err)
+
+	// If we're redefining based on inputs, then we also want to
+	// go through and set a path from our input root to all the values
+	// in the graph. This lets us pick the shortest path through based on
+	// any valid input.
+	if args.redefining {
+		for _, raw := range g.Vertices() {
+			var typ reflect.Type
+
+			// We are looking for either a value or a typed arg. Both
+			// of these represent "inputs" to a function.
+			v, ok := raw.(*valueVertex)
+			if ok {
+				typ = v.Type
+			}
+			if !ok {
+				v, ok := raw.(*typedArgVertex)
+				if !ok {
+					continue
+				}
+
+				typ = v.Type
+			}
+
+			// For redefining, the caller can setup filters to determine
+			// what inputs they're capable of providing. If any filter
+			// says it is possible, then we take the value.
+			include := true
+			for _, f := range args.filters {
+				if !f(typ) {
+					include = false
+					break
+				}
+			}
+
+			if include {
+				// Connect this to the root, since it is a potential input to
+				// satisfy a function that gets us to redefine.
+				g.AddEdge(raw, vertexRoot)
+			}
 		}
 	}
 
-	// If we got errors building up arguments then we're done.
+	// We need to allow any typed argument to depend on a typed output.
+	// This lets two converters chain together.
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*typedArgVertex)
+		if !ok {
+			continue
+		}
+
+		g.AddEdgeWeighted(v, g.Add(&typedOutputVertex{
+			Type: v.Type,
+		}), weightTyped)
+	}
+
+	log.Trace("full graph (may have cycles)", "graph", g.String())
+
+	// TODO: explain why
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*typedArgVertex)
+		if !ok {
+			continue
+		}
+
+		keep := map[interface{}]struct{}{}
+		for _, out := range g.OutEdges(v) {
+			if v, ok := out.(*valueVertex); ok && v.Value.IsValid() {
+				keep[graph.VertexID(out)] = struct{}{}
+				break
+			}
+		}
+
+		if len(keep) > 0 {
+			for _, v := range vertexI {
+				keep[graph.VertexID(v)] = struct{}{}
+			}
+
+			for _, out := range g.OutEdges(v) {
+				if _, ok := keep[graph.VertexID(out)]; !ok {
+					g.RemoveEdge(v, out)
+				}
+			}
+		}
+	}
+
+	// Next we do a DFS from each input A in I to the function F.
+	// This gives us the full set of reachable nodes from our inputs
+	// and at most to F. Using this information, we can prune any nodes
+	// that are guaranteed to be unused.
+	//
+	// DFS from the input root and record what we see. We have to reverse the
+	// graph here because we typically have out edges pointing to
+	// requirements, but we're going from requirements (inputs) to
+	// the function.
+	visited := map[interface{}]struct{}{graph.VertexID(vertexF): struct{}{}}
+	g.Reverse().DFS(vertexRoot, func(v graph.Vertex, next func() error) error {
+		if v == vertexF {
+			return nil
+		}
+
+		visited[graph.VertexID(v)] = struct{}{}
+		return next()
+	})
+
+	// Remove all the non-visited vertices. After this, what we'll have
+	// is a graph that has many paths getting us from inputs to function,
+	// but we will have no spurious vertices that are unreachable from our
+	// inputs.
+	for _, v := range g.Vertices() {
+		if _, ok := visited[graph.VertexID(v)]; !ok {
+			g.Remove(v)
+		}
+	}
+	log.Trace("graph after input DFS", "graph", g.String())
+
+	return
+}
+
+// Call calls the function. Use the various Arg functions to set the state
+// for the function call.
+func (f *Func) Call(opts ...Arg) Result {
+	// Build up our args
+	builder, buildErr := newArgBuilder(opts...)
 	if buildErr != nil {
 		return resultError(buildErr)
 	}
@@ -229,6 +380,9 @@ func (f *Func) reachTarget(
 		// With the latest shortest paths, let's add the path for this target.
 		paths[i] = currentG.EdgeToPath(current, edgeTo)
 		log.Trace("path for target", "target", current, "path", paths[i])
+
+		// Store our input used
+		state.InputSet[graph.VertexID(paths[i][0])] = paths[i][0]
 	}
 
 	// Go through each path
@@ -268,9 +422,14 @@ func (f *Func) reachTarget(
 				}
 
 			case *typedArgVertex:
-				// The value of this is the last value vertex we saw. The graph
-				// walk should ensure this is the correct type.
-				v.Value = state.Value
+				// If we have a value set on the state then we set that to this
+				// value. This is true in every Call case but is always false
+				// for Redefine.
+				if state.Value.IsValid() && state.Value.Type().AssignableTo(v.Type) {
+					// The value of this is the last value vertex we saw. The graph
+					// walk should ensure this is the correct type.
+					v.Value = state.Value
+				}
 
 				// Setup our mapping so that we know that this wildcard
 				// maps to this name.
@@ -376,11 +535,15 @@ type callState struct {
 	// Value is the last seen value vertex. This state is preserved so
 	// we can set the typedVertex values properly.
 	Value reflect.Value
+
+	// TODO
+	InputSet map[interface{}]graph.Vertex
 }
 
 func newCallState() *callState {
 	return &callState{
 		NamedValue: map[string]reflect.Value{},
 		TypedValue: map[reflect.Type]reflect.Value{},
+		InputSet:   map[interface{}]graph.Vertex{},
 	}
 }

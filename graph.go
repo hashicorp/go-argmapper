@@ -40,7 +40,7 @@ type funcVertex struct {
 	Func *Func
 }
 
-func (v *funcVertex) Hashcode() interface{} { return v.Func }
+func (v *funcVertex) Hashcode() interface{} { return v.Func.fn.Type() }
 func (v *funcVertex) String() string        { return "func: " + v.Func.fn.String() }
 
 // typedArgVertex represents a typed argument to a function. These have no

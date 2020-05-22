@@ -43,8 +43,8 @@ import (
 // for logging.
 type Func struct {
 	fn     reflect.Value
-	input  *valueSet
-	output *valueSet
+	input  *ValueSet
+	output *ValueSet
 }
 
 func NewFunc(f interface{}) (*Func, error) {
@@ -77,6 +77,14 @@ func NewFunc(f interface{}) (*Func, error) {
 		output: outTyp,
 	}, nil
 }
+
+// Input returns the input ValueSet for this function, representing the values
+// that this function requires as input.
+func (f *Func) Input() *ValueSet { return f.input }
+
+// Output returns the output ValueSet for this function, representing the values
+// that this function produces as an output.
+func (f *Func) Output() *ValueSet { return f.output }
 
 // graph adds this function to the graph. The given root should be a single
 // shared root to the graph, typically a rootVertex. This returns the
@@ -133,7 +141,6 @@ func (f *Func) graph(g *graph.Graph, root graph.Vertex, includeOutput bool) grap
 func (f *Func) outputValues(r Result, vs []graph.Vertex, state *callState) {
 	// Get our struct
 	structVal := f.output.result(r).out[0]
-	println("OUTPUT", fmt.Sprintf("%#v", structVal.Interface()))
 
 	// Go through our out edges to find all our results so we can update
 	// the graph nodes with our values. Along the way, we also update our

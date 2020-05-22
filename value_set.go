@@ -6,14 +6,14 @@ import (
 	"strings"
 )
 
-// valueSet tracks the values either accepted or returned as part of
+// ValueSet tracks the values either accepted or returned as part of
 // a function or converter.
 //
 // Internally, argmapper converts all functions to a signature of
 // `func(Struct) (Struct, error)`. This lets the internals simplify a lot
 // by expecting to only set struct fields. On the edges (when calling functions
 // or returning values) we convert to and from the true expected arguments.
-type valueSet struct {
+type ValueSet struct {
 	// structType is a struct that contains all the settable values.
 	structType reflect.Type
 
@@ -40,10 +40,10 @@ type structField struct {
 	Type reflect.Type
 }
 
-func newValueSet(count int, get func(int) reflect.Type) (*valueSet, error) {
+func newValueSet(count int, get func(int) reflect.Type) (*ValueSet, error) {
 	// If there are no arguments, then return an empty value set.
 	if count == 0 {
-		return &valueSet{}, nil
+		return &ValueSet{}, nil
 	}
 
 	// If we have exactly one argument, let's check if its a struct. If
@@ -78,14 +78,14 @@ func newValueSet(count int, get func(int) reflect.Type) (*valueSet, error) {
 	return t, nil
 }
 
-func newValueSetFromStruct(typ reflect.Type) (*valueSet, error) {
+func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 	// Verify our value is a struct
 	if typ.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("struct expected, got %s", typ.Kind())
 	}
 
 	// We will accumulate our results here
-	result := &valueSet{
+	result := &ValueSet{
 		structType:  typ,
 		namedFields: make(map[string]*structField),
 		typedFields: make(map[reflect.Type]*structField),
@@ -146,7 +146,7 @@ func newValueSetFromStruct(typ reflect.Type) (*valueSet, error) {
 }
 
 // New returns a new structValue that can be used for value population.
-func (t *valueSet) New() *structValue {
+func (t *ValueSet) New() *structValue {
 	result := &structValue{typ: t}
 	if t.structType != nil {
 		result.value = reflect.New(t.structType).Elem()
@@ -156,17 +156,17 @@ func (t *valueSet) New() *structValue {
 }
 
 // lifted returns true if this field is lifted.
-func (t *valueSet) lifted() bool {
+func (t *ValueSet) lifted() bool {
 	return t.isLifted
 }
 
-func (t *valueSet) empty() bool {
+func (t *ValueSet) empty() bool {
 	return t.structType == nil
 }
 
 // result takes the result that matches this struct type and adapts it
 // if necessary (if the struct type is lifted or so on).
-func (t *valueSet) result(r Result) Result {
+func (t *ValueSet) result(r Result) Result {
 	// If we aren't lifted, we return the result as-is.
 	if !t.lifted() {
 		return r
@@ -184,7 +184,7 @@ func (t *valueSet) result(r Result) Result {
 }
 
 type structValue struct {
-	typ   *valueSet
+	typ   *ValueSet
 	value reflect.Value
 }
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
@@ -13,11 +14,33 @@ import (
 // necessary to reach the target.
 type Arg func(*argBuilder) error
 
+type FilterFunc func(reflect.Type) bool
+
 type argBuilder struct {
 	logger hclog.Logger
 	named  map[string]reflect.Value
 	typed  map[reflect.Type]reflect.Value
 	convs  []*Func
+
+	redefining bool
+	filters    []FilterFunc
+}
+
+func newArgBuilder(opts ...Arg) (*argBuilder, error) {
+	builder := &argBuilder{
+		logger: hclog.L(),
+		named:  make(map[string]reflect.Value),
+		typed:  make(map[reflect.Type]reflect.Value),
+	}
+
+	var buildErr error
+	for _, opt := range opts {
+		if err := opt(builder); err != nil {
+			buildErr = multierror.Append(buildErr, err)
+		}
+	}
+
+	return builder, buildErr
 }
 
 // Named specifies a named argument with the given value. This will satisfy
@@ -58,6 +81,13 @@ func WithConvFunc(fs ...interface{}) Arg {
 	}
 }
 
+func Filter(f FilterFunc) Arg {
+	return func(a *argBuilder) error {
+		a.filters = append(a.filters, f)
+		return nil
+	}
+}
+
 func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
 	var result []graph.Vertex
 
@@ -90,6 +120,11 @@ func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
 
 		// Track
 		result = append(result, input)
+	}
+
+	// If we have converters, add those.
+	for _, f := range b.convs {
+		f.graph(g, root, true)
 	}
 
 	return result
