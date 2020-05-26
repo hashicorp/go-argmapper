@@ -134,11 +134,11 @@ func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 		copy(callArgs, opts)
 
 		// Setup our values
-		for name, f := range set.namedFields {
-			callArgs = append(callArgs, Named(name, v.Field(f.Index).Interface()))
+		for name, f := range set.namedValues {
+			callArgs = append(callArgs, Named(name, v.Field(f.index).Interface()))
 		}
-		for _, f := range set.typedFields {
-			callArgs = append(callArgs, Typed(v.Field(f.Index).Interface()))
+		for _, f := range set.typedValues {
+			callArgs = append(callArgs, Typed(v.Field(f.index).Interface()))
 		}
 
 		// Call
@@ -174,11 +174,11 @@ func (f *Func) zeroFunc() reflect.Value {
 	return reflect.MakeFunc(fn, func(args []reflect.Value) []reflect.Value {
 		// Create our struct type and set all the fields to zero
 		v := t.New()
-		for _, f := range t.namedFields {
-			v.Field(f.Index).Set(reflect.Zero(f.Type))
+		for _, f := range t.namedValues {
+			v.Field(f.index).Set(reflect.Zero(f.Type))
 		}
-		for _, f := range t.typedFields {
-			v.Field(f.Index).Set(reflect.Zero(f.Type))
+		for _, f := range t.typedValues {
+			v.Field(f.index).Set(reflect.Zero(f.Type))
 		}
 
 		// Get our result. If we're expecting an error value, return nil for that.

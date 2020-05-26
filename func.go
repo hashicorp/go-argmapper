@@ -105,27 +105,33 @@ func (f *Func) graph(g *graph.Graph, root graph.Vertex, includeOutput bool) grap
 	}
 
 	// Add all our inputs and add an edge from the func to the input
-	for k, f := range f.input.namedFields {
-		g.AddEdge(vertex, g.Add(&valueVertex{
-			Name: k,
-			Type: f.Type,
-		}))
-	}
-	for _, f := range f.input.typedFields {
-		g.AddEdgeWeighted(vertex, g.Add(&typedArgVertex{
-			Type: f.Type,
-		}), weightTyped)
+	for _, val := range f.input.values {
+		switch val.Kind() {
+		case ValueNamed:
+			g.AddEdge(vertex, g.Add(&valueVertex{
+				Name: val.Name,
+				Type: val.Type,
+			}))
+
+		case ValueTyped:
+			g.AddEdgeWeighted(vertex, g.Add(&typedArgVertex{
+				Type: val.Type,
+			}), weightTyped)
+
+		default:
+			panic(fmt.Sprintf("unknown value kind: %s", val.Kind()))
+		}
 	}
 
 	if includeOutput {
 		// Add all our outputs
-		for k, f := range f.output.namedFields {
+		for k, f := range f.output.namedValues {
 			g.AddEdge(g.Add(&valueVertex{
 				Name: k,
 				Type: f.Type,
 			}), vertex)
 		}
-		for _, f := range f.output.typedFields {
+		for _, f := range f.output.typedValues {
 			g.AddEdgeWeighted(g.Add(&typedOutputVertex{
 				Type: f.Type,
 			}), vertex, weightTyped)
@@ -150,13 +156,12 @@ func (f *Func) outputValues(r Result, vs []graph.Vertex, state *callState) {
 		case *valueVertex:
 			// Set the value on the vertex. During the graph walk, we'll
 			// set the Named value.
-			v.Value = structVal.Field(f.output.namedFields[v.Name].Index)
+			v.Value = structVal.Field(f.output.namedValues[v.Name].index)
 
 		case *typedOutputVertex:
 			// Get our field with the same name
-			// TODO: this type String is nasty
-			field := f.output.typedFields[v.Type]
-			v.Value = structVal.Field(field.Index)
+			field := f.output.typedValues[v.Type]
+			v.Value = structVal.Field(field.index)
 		}
 	}
 }

@@ -508,27 +508,32 @@ func (f *Func) callDirect(log hclog.Logger, state *callState) Result {
 	// Initialize the struct we'll be populating
 	var buildErr error
 	structVal := f.input.New()
-	for k, f := range f.input.namedFields {
-		v, ok := state.NamedValue[k]
-		if !ok {
-			buildErr = multierror.Append(buildErr, fmt.Errorf(
-				"argument cannot be satisfied: %s", k))
-			continue
+	for _, val := range f.input.values {
+		switch val.Kind() {
+		case ValueNamed:
+			v, ok := state.NamedValue[val.Name]
+			if !ok {
+				buildErr = multierror.Append(buildErr, fmt.Errorf(
+					"argument cannot be satisfied: %s", val.Name))
+				continue
+			}
+
+			structVal.Field(val.index).Set(v)
+
+		case ValueTyped:
+			v, ok := state.TypedValue[val.Type]
+			if !ok {
+				buildErr = multierror.Append(buildErr, fmt.Errorf(
+					"typed argument cannot be satisfied at index %d (type %s)",
+					val.index, val.Type.String()))
+				continue
+			}
+
+			structVal.Field(val.index).Set(v)
+
+		default:
+			panic(fmt.Sprintf("unknown value type: %#v", val))
 		}
-
-		structVal.Field(f.Index).Set(v)
-	}
-
-	for _, f := range f.input.typedFields {
-		v, ok := state.TypedValue[f.Type]
-		if !ok {
-			buildErr = multierror.Append(buildErr, fmt.Errorf(
-				"typed argument cannot be satisfied at index %d (type %s)",
-				f.Index, f.Type.String()))
-			continue
-		}
-
-		structVal.Field(f.Index).Set(v)
 	}
 
 	// If there was an error setting up the struct, then report that.

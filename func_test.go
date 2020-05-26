@@ -23,7 +23,7 @@ func TestFunc(t *testing.T) {
 		Err      string
 	}{
 		{
-			"basic matching",
+			"basic named matching",
 			func(in struct {
 				Struct
 

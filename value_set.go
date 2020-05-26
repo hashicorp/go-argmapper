@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+//go:generate stringer -type=ValueKind
+
 // ValueSet tracks the values either accepted or returned as part of
 // a function or converter.
 //
@@ -17,12 +19,12 @@ type ValueSet struct {
 	// structType is a struct that contains all the settable values.
 	structType reflect.Type
 
-	// namedFields are fields that have a specifc name. The key is the name.
-	namedFields map[string]*structField
-
-	// typedFields are the fields that are only type-matching and can accept
-	// values of any name as long as the type matches.
-	typedFields map[reflect.Type]*structField
+	// values is the set of values that this ValueSet contains. namedValues,
+	// typedValues, etc. are convenience maps for looking up values more
+	// easily.
+	values      []Value
+	namedValues map[string]Value
+	typedValues map[reflect.Type]Value
 
 	// isLifted is if this represents a lifted struct. A lifted struct
 	// is one where we automatically converted flat argument lists to
@@ -30,14 +32,40 @@ type ValueSet struct {
 	isLifted bool
 }
 
-type structField struct {
-	// Index is the index using reflect.Value.Field that can be used to
-	// set this field on the structType. This makes it easy to quickly set
-	// any value.
-	Index int
+// Value represents an input or output of a Func. In normal operation, you
+// do not need to interact with Value objects directly. This structure
+// is exposed for users who are trying to introspect on functions or manually
+// build functions. This is an advanced operation.
+//
+// A Value represents multiple types of values depending on what fields are
+// set. Please read the documentation carefully and use the exported methods
+// to assist with checking value types.
+type Value struct {
+	// valueInternal is the internal information for the value. This is only
+	// set and used by ValueSet.
+	valueInternal
 
-	// Type is the type of this field.
+	// Name is the name of the value. This may be empty if this is a type-only
+	// value. If the name is set, then we will satisfy this input with an arg
+	// with this name and type.
+	Name string
+
+	// Type is the type of the value. This must be set.
 	Type reflect.Type
+}
+
+// TODO
+type ValueKind uint
+
+const (
+	ValueInvalid ValueKind = iota
+	ValueNamed
+	ValueTyped
+)
+
+type valueInternal struct {
+	// index is the struct field index for the ValueSet on which to set values.
+	index int
 }
 
 func newValueSet(count int, get func(int) reflect.Type) (*ValueSet, error) {
@@ -87,8 +115,9 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 	// We will accumulate our results here
 	result := &ValueSet{
 		structType:  typ,
-		namedFields: make(map[string]*structField),
-		typedFields: make(map[reflect.Type]*structField),
+		values:      []Value{},
+		namedValues: map[string]Value{},
+		typedValues: map[reflect.Type]Value{},
 	}
 
 	// Go through the fields and record them all
@@ -128,21 +157,35 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 
 		// Name is always lowercase
 		name = strings.ToLower(name)
-
-		// Record it
-		field := &structField{
-			Index: i,
-			Type:  sf.Type,
+		if _, ok := options["typeOnly"]; ok {
+			name = ""
 		}
 
-		if _, ok := options["typeOnly"]; ok {
-			result.typedFields[field.Type] = field
-		} else {
-			result.namedFields[name] = field
+		// Record it
+		value := Value{
+			Name: name,
+			Type: sf.Type,
+			valueInternal: valueInternal{
+				index: i,
+			},
+		}
+
+		result.values = append(result.values, value)
+		switch value.Kind() {
+		case ValueNamed:
+			result.namedValues[value.Name] = value
+
+		case ValueTyped:
+			result.typedValues[value.Type] = value
 		}
 	}
 
 	return result, nil
+}
+
+// Values returns the values in this ValueSet.
+func (t *ValueSet) Values() []Value {
+	return nil
 }
 
 // New returns a new structValue that can be used for value population.
@@ -175,12 +218,20 @@ func (t *ValueSet) result(r Result) Result {
 	// If we are lifted, then we need to translate the output arguments
 	// to their proper types in a struct.
 	structOut := reflect.New(t.structType).Elem()
-	for _, f := range t.typedFields {
-		structOut.Field(f.Index).Set(r.out[f.Index])
+	for _, f := range t.typedValues {
+		structOut.Field(f.index).Set(r.out[f.index])
 	}
 
 	r.out = []reflect.Value{structOut}
 	return r
+}
+
+func (v *Value) Kind() ValueKind {
+	if v.Name != "" {
+		return ValueNamed
+	}
+
+	return ValueTyped
 }
 
 type structValue struct {
@@ -204,9 +255,9 @@ func (v *structValue) CallIn() []reflect.Value {
 	}
 
 	// This is lifted, so we need to unpack them in order.
-	result := make([]reflect.Value, len(v.typ.typedFields))
-	for _, f := range v.typ.typedFields {
-		result[f.Index] = v.value.Field(f.Index)
+	result := make([]reflect.Value, len(v.typ.typedValues))
+	for _, f := range v.typ.typedValues {
+		result[f.index] = v.value.Field(f.index)
 	}
 
 	return result
