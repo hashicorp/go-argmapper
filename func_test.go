@@ -644,6 +644,24 @@ func TestFunc(t *testing.T) {
 			},
 			"",
 		},
+
+		{
+			"subtype type matching named",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				NamedSubtype("b", 36, "bar"),
+			},
+			[]interface{}{
+				36,
+			},
+			"",
+		},
 	}
 
 	for _, tt := range cases {
