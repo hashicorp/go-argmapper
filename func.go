@@ -136,7 +136,8 @@ func (f *Func) graph(g *graph.Graph, root graph.Vertex, includeOutput bool) grap
 		}
 		for _, f := range f.output.typedValues {
 			g.AddEdgeWeighted(g.Add(&typedOutputVertex{
-				Type: f.Type,
+				Type:    f.Type,
+				Subtype: f.Subtype,
 			}), vertex, weightTyped)
 		}
 	}

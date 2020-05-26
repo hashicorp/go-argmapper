@@ -611,6 +611,39 @@ func TestFunc(t *testing.T) {
 			},
 			"",
 		},
+
+		{
+			"subtype type conversion",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly,subtype=foo"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				TypedSubtype(24, "bar"),
+				WithConvFunc(func(s struct {
+					Struct
+
+					C int `argmapper:",typeOnly,subtype=bar"`
+				}) struct {
+					Struct
+
+					D int `argmapper:",typeOnly,subtype=foo"`
+				} {
+					return struct {
+						Struct
+
+						D int `argmapper:",typeOnly,subtype=foo"`
+					}{D: s.C + 1}
+				}),
+			},
+			[]interface{}{
+				25,
+			},
+			"",
+		},
 	}
 
 	for _, tt := range cases {
