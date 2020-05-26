@@ -54,7 +54,8 @@ type Value struct {
 	Type reflect.Type
 }
 
-// TODO
+// ValueKind is returned by Value.Kind to designate what kind of value this is:
+// a value expecting a type and name, a value with just type matching, etc.
 type ValueKind uint
 
 const (
@@ -183,9 +184,9 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 	return result, nil
 }
 
-// Values returns the values in this ValueSet.
+// Values returns the values in this ValueSet. This result is not mutable.
 func (t *ValueSet) Values() []Value {
-	return nil
+	return t.values
 }
 
 // New returns a new structValue that can be used for value population.
