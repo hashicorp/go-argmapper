@@ -521,6 +521,24 @@ func TestFunc(t *testing.T) {
 			},
 			"",
 		},
+
+		{
+			"subtype named not specified",
+			func(in struct {
+				Struct
+
+				A int
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				NamedSubtype("a", 24, "bar"),
+			},
+			[]interface{}{
+				24,
+			},
+			"",
+		},
 	}
 
 	for _, tt := range cases {

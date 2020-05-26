@@ -33,25 +33,23 @@ func (f *Func) callGraph(args *argBuilder) (
 	// we already know about. These are tracked as "vertexI".
 	vertexI = args.graph(&g, vertexRoot)
 
-	// TODO: docs
-	/*
+	// All named values that have no subtype can take a value from
+	// any other named value that has a subtype.
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*valueVertex)
+		if !ok || v.Subtype != "" || v.Value.IsValid() {
+			continue
+		}
+
 		for _, raw := range g.Vertices() {
-			v, ok := raw.(*valueVertex)
-			if !ok {
-				continue
-			}
-			if v.Subtype == "" {
-				continue
-			}
-			if !v.Value.IsValid() {
+			v2, ok := raw.(*valueVertex)
+			if !ok || v2.Type != v.Type || v2.Subtype == "" {
 				continue
 			}
 
-			g.AddEdgeWeighted(g.Add(&typedArgVertex{
-				Type: v.Type,
-			}), v, weightTyped)
+			g.AddEdgeWeighted(v, v2, weightTyped)
 		}
-	*/
+	}
 
 	// Next, for all values we may have or produce, we need to create
 	// the vertices for the type-only value. This lets us say, for example,
