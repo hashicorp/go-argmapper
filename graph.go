@@ -15,6 +15,10 @@ const (
 	// type-only vertex. We weigh these heavier since we prefer valued vertices.
 	weightTyped = 5
 
+	// weightTypedOtherSubtype is the weight to use for edges that connect
+	// types that match but subtypes that do not match.
+	weightTypedOtherSubtype = 20
+
 	// weightMatchingName is the weight to use for the edges to any value
 	// vertex with a matching name. This has the effect of preferring edges
 	// from "A string" to "A int" for example (over "B string" to "A int"),

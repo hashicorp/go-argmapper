@@ -132,23 +132,21 @@ func (f *Func) callGraph(args *argBuilder) (
 		}
 	}
 
-	/*
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*typedArgVertex)
+		if !ok || v.Subtype != "" {
+			continue
+		}
+
 		for _, raw := range g.Vertices() {
-			v, ok := raw.(*typedOutputVertex)
-			if !ok || v.Subtype != "" {
+			v2, ok := raw.(*typedOutputVertex)
+			if !ok || v2.Type != v.Type || v2.Subtype == "" {
 				continue
 			}
 
-			for _, raw := range g.Vertices() {
-				v2, ok := raw.(*typedOutputVertex)
-				if !ok || v2.Type != v.Type || v2.Subtype == "" {
-					continue
-				}
-
-				g.AddEdgeWeighted(v, v2, weightTyped)
-			}
+			g.AddEdgeWeighted(v, v2, weightTypedOtherSubtype)
 		}
-	*/
+	}
 
 	log.Trace("full graph (may have cycles)", "graph", g.String())
 

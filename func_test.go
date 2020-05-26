@@ -577,6 +577,40 @@ func TestFunc(t *testing.T) {
 			},
 			"",
 		},
+
+		{
+			"subtype type no match",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly,subtype=foo"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				TypedSubtype(36, "bar"),
+			},
+			nil,
+			"cannot be",
+		},
+
+		{
+			"subtype type not specified",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				TypedSubtype(36, "foo"),
+			},
+			[]interface{}{
+				36,
+			},
+			"",
+		},
 	}
 
 	for _, tt := range cases {
