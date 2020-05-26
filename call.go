@@ -33,6 +33,26 @@ func (f *Func) callGraph(args *argBuilder) (
 	// we already know about. These are tracked as "vertexI".
 	vertexI = args.graph(&g, vertexRoot)
 
+	// TODO: docs
+	/*
+		for _, raw := range g.Vertices() {
+			v, ok := raw.(*valueVertex)
+			if !ok {
+				continue
+			}
+			if v.Subtype == "" {
+				continue
+			}
+			if !v.Value.IsValid() {
+				continue
+			}
+
+			g.AddEdgeWeighted(g.Add(&typedArgVertex{
+				Type: v.Type,
+			}), v, weightTyped)
+		}
+	*/
+
 	// Next, for all values we may have or produce, we need to create
 	// the vertices for the type-only value. This lets us say, for example,
 	// that an input "A string" satisfies anything that requires only "string".
@@ -189,7 +209,7 @@ func (f *Func) callGraph(args *argBuilder) (
 			}
 
 			err = multierror.Append(err, fmt.Errorf(
-				"cannot be satisfied: %s", name))
+				"argument cannot be satisfied: %s", name))
 		}
 	}
 
@@ -204,126 +224,13 @@ func (f *Func) Call(opts ...Arg) Result {
 	if buildErr != nil {
 		return resultError(buildErr)
 	}
-
-	var g graph.Graph
 	log := builder.logger
 
-	// Create a shared root. Anything reachable from the root is not pruned.
-	// This is primarily inputs but may also contain parameterless converters
-	// (providers).
-	vertexRoot := g.Add(&rootVertex{})
-
-	// Build the graph. The first step is to add our function and all the
-	// requirements of the function. We keep track of this in vertexF and
-	// vertexT, respectively, because we'll need these later.
-	vertexF := f.graph(&g, vertexRoot, false)
-
-	// If we have converters, add those. See ConvSet.graph for more details.
-	for _, f := range builder.convs {
-		f.graph(&g, vertexRoot, true)
+	// Build our call graph
+	g, _, vertexF, _, err := f.callGraph(builder)
+	if err != nil {
+		return resultError(err)
 	}
-
-	// Next, we add "inputs", which are the given named values that
-	// we already know about. These are tracked as "vertexI".
-	vertexI := builder.graph(&g, vertexRoot)
-
-	// Next, for all values we may have or produce, we need to create
-	// the vertices for the type-only value. This lets us say, for example,
-	// that an input "A string" satisfies anything that requires only "string".
-	for _, raw := range g.Vertices() {
-		v, ok := raw.(*valueVertex)
-		if !ok {
-			continue
-		}
-
-		// We only add an edge from the output if we require a value.
-		// If we already have a value then we don't need to request one.
-		if !v.Value.IsValid() {
-			g.AddEdgeWeighted(v, g.Add(&typedOutputVertex{
-				Type: v.Type,
-			}), weightTyped)
-		}
-
-		// We always add an edge from the arg to the value, whether it
-		// has one or not. In the next step, we'll prune any typed arguments
-		// that already have a satisfied value.
-		g.AddEdgeWeighted(g.Add(&typedArgVertex{
-			Type: v.Type,
-		}), v, weightTyped)
-	}
-
-	// We need to allow any typed argument to depend on a typed output.
-	// This lets two converters chain together.
-	for _, raw := range g.Vertices() {
-		v, ok := raw.(*typedArgVertex)
-		if !ok {
-			continue
-		}
-
-		g.AddEdgeWeighted(v, g.Add(&typedOutputVertex{
-			Type: v.Type,
-		}), weightTyped)
-	}
-
-	log.Trace("full graph (may have cycles)", "graph", g.String())
-
-	// TODO: explain why
-	for _, raw := range g.Vertices() {
-		v, ok := raw.(*typedArgVertex)
-		if !ok {
-			continue
-		}
-
-		keep := map[interface{}]struct{}{}
-		for _, out := range g.OutEdges(v) {
-			if v, ok := out.(*valueVertex); ok && v.Value.IsValid() {
-				keep[graph.VertexID(out)] = struct{}{}
-				break
-			}
-		}
-
-		if len(keep) > 0 {
-			for _, v := range vertexI {
-				keep[graph.VertexID(v)] = struct{}{}
-			}
-
-			for _, out := range g.OutEdges(v) {
-				if _, ok := keep[graph.VertexID(out)]; !ok {
-					g.RemoveEdge(v, out)
-				}
-			}
-		}
-	}
-
-	// Next we do a DFS from each input A in I to the function F.
-	// This gives us the full set of reachable nodes from our inputs
-	// and at most to F. Using this information, we can prune any nodes
-	// that are guaranteed to be unused.
-	//
-	// DFS from the input root and record what we see. We have to reverse the
-	// graph here because we typically have out edges pointing to
-	// requirements, but we're going from requirements (inputs) to
-	// the function.
-	visited := map[interface{}]struct{}{graph.VertexID(vertexF): struct{}{}}
-	g.Reverse().DFS(vertexRoot, func(v graph.Vertex, next func() error) error {
-		if v == vertexF {
-			return nil
-		}
-
-		visited[graph.VertexID(v)] = struct{}{}
-		return next()
-	})
-
-	// Remove all the non-visited vertices. After this, what we'll have
-	// is a graph that has many paths getting us from inputs to function,
-	// but we will have no spurious vertices that are unreachable from our
-	// inputs.
-	for _, v := range g.Vertices() {
-		if _, ok := visited[graph.VertexID(v)]; !ok {
-			g.Remove(v)
-		}
-	}
-	log.Trace("graph after input DFS", "graph", g.String())
 
 	// Get the topological sort. We only need this so that we can start
 	// calculating shortest path. We'll use shortest path information to
