@@ -24,14 +24,15 @@ const (
 
 // valueVertex represents any named and typed value.
 type valueVertex struct {
-	Name string
-	Type reflect.Type
+	Name    string
+	Type    reflect.Type
+	Subtype string
 
 	Value reflect.Value
 }
 
 func (v *valueVertex) Hashcode() interface{} {
-	return fmt.Sprintf("%s/%s", v.Name, v.Type.String())
+	return fmt.Sprintf("%s/%s/%s", v.Name, v.Type.String(), v.Subtype)
 }
 
 // funcVertex is our target function. There is only ever one of these

@@ -52,6 +52,12 @@ type Value struct {
 
 	// Type is the type of the value. This must be set.
 	Type reflect.Type
+
+	// Subtype is a key that specifies a unique "subtype" for the type.
+	// This can be used to identify dynamic values such as protobuf Any types
+	// where the full type isn't available. This is optional. For full details
+	// on subtype matching see the package docs.
+	Subtype string
 }
 
 // ValueKind is returned by Value.Kind to designate what kind of value this is:
@@ -164,8 +170,9 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 
 		// Record it
 		value := Value{
-			Name: name,
-			Type: sf.Type,
+			Name:    name,
+			Type:    sf.Type,
+			Subtype: options["subtype"],
 			valueInternal: valueInternal{
 				index: i,
 			},
@@ -187,6 +194,12 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 // Values returns the values in this ValueSet. This result is not mutable.
 func (t *ValueSet) Values() []Value {
 	return t.values
+}
+
+// Func returns a new Func that calls back into f with the values it receives
+// when it is called.
+func (t *ValueSet) Func(f func(vs map[Value]interface{}) error) (*Func, error) {
+	return nil, nil
 }
 
 // New returns a new structValue that can be used for value population.

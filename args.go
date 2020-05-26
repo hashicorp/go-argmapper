@@ -17,10 +17,12 @@ type Arg func(*argBuilder) error
 type FilterFunc func(reflect.Type) bool
 
 type argBuilder struct {
-	logger hclog.Logger
-	named  map[string]reflect.Value
-	typed  map[reflect.Type]reflect.Value
-	convs  []*Func
+	logger   hclog.Logger
+	named    map[string]reflect.Value
+	namedSub map[string]map[string]reflect.Value
+	typed    map[reflect.Type]reflect.Value
+	typedSub map[reflect.Type]map[string]reflect.Value
+	convs    []*Func
 
 	redefining bool
 	filters    []FilterFunc
@@ -28,9 +30,11 @@ type argBuilder struct {
 
 func newArgBuilder(opts ...Arg) (*argBuilder, error) {
 	builder := &argBuilder{
-		logger: hclog.L(),
-		named:  make(map[string]reflect.Value),
-		typed:  make(map[reflect.Type]reflect.Value),
+		logger:   hclog.L(),
+		named:    make(map[string]reflect.Value),
+		namedSub: make(map[string]map[string]reflect.Value),
+		typed:    make(map[reflect.Type]reflect.Value),
+		typedSub: make(map[reflect.Type]map[string]reflect.Value),
 	}
 
 	var buildErr error
@@ -53,6 +57,18 @@ func Named(n string, v interface{}) Arg {
 	}
 }
 
+// NamedSubtype is the same as Named but specifies a subtype for the value.
+func NamedSubtype(n string, v interface{}, st string) Arg {
+	return func(a *argBuilder) error {
+		n = strings.ToLower(n)
+		if a.namedSub[n] == nil {
+			a.namedSub[n] = map[string]reflect.Value{}
+		}
+		a.namedSub[n][st] = reflect.ValueOf(v)
+		return nil
+	}
+}
+
 // Typed specifies a typed argument with the given value. This will satisfy
 // any requirement where the type is assignable to a required value. The name
 // can be anything of the required value.
@@ -60,6 +76,19 @@ func Typed(v interface{}) Arg {
 	return func(a *argBuilder) error {
 		rv := reflect.ValueOf(v)
 		a.typed[rv.Type()] = rv
+		return nil
+	}
+}
+
+// TypedSubtype is the same as Typed but specifies a subtype key for the value.
+func TypedSubtype(v interface{}, st string) Arg {
+	return func(a *argBuilder) error {
+		rv := reflect.ValueOf(v)
+		rt := rv.Type()
+		if a.typedSub[rt] == nil {
+			a.typedSub[rt] = map[string]reflect.Value{}
+		}
+		a.typedSub[rt][st] = rv
 		return nil
 	}
 }
@@ -105,6 +134,25 @@ func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
 
 		// Track
 		result = append(result, input)
+	}
+
+	// Add our named inputs
+	for k, m := range b.namedSub {
+		for st, v := range m {
+			// Add the input
+			input := g.AddOverwrite(&valueVertex{
+				Name:    k,
+				Type:    v.Type(),
+				Subtype: st,
+				Value:   v,
+			})
+
+			// Input depends on the input root
+			g.AddEdge(input, root)
+
+			// Track
+			result = append(result, input)
+		}
 	}
 
 	// Add our typed inputs

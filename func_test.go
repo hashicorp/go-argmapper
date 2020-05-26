@@ -450,6 +450,77 @@ func TestFunc(t *testing.T) {
 			[]interface{}{"1212"},
 			"",
 		},
+
+		//-----------------------------------------------------------
+		// TYPED INPUT WITH SUBTYPES
+
+		{
+			"subtype named match",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",subtype=foo"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				NamedSubtype("a", 24, "bar"),
+				NamedSubtype("a", 36, "foo"),
+			},
+			[]interface{}{
+				36,
+			},
+			"",
+		},
+
+		{
+			"subtype no match",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",subtype=foo"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				NamedSubtype("a", 24, "bar"),
+			},
+			nil,
+			"argument cannot",
+		},
+
+		{
+			"subtype named conversion",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",subtype=foo"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				NamedSubtype("a", 24, "bar"),
+				WithConvFunc(func(s struct {
+					Struct
+
+					A int `argmapper:",subtype=bar"`
+				}) struct {
+					Struct
+
+					A int `argmapper:",subtype=foo"`
+				} {
+					return struct {
+						Struct
+
+						A int `argmapper:",subtype=foo"`
+					}{A: s.A}
+				}),
+			},
+			[]interface{}{
+				24,
+			},
+			"",
+		},
 	}
 
 	for _, tt := range cases {

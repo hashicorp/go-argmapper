@@ -109,8 +109,9 @@ func (f *Func) graph(g *graph.Graph, root graph.Vertex, includeOutput bool) grap
 		switch val.Kind() {
 		case ValueNamed:
 			g.AddEdge(vertex, g.Add(&valueVertex{
-				Name: val.Name,
-				Type: val.Type,
+				Name:    val.Name,
+				Type:    val.Type,
+				Subtype: val.Subtype,
 			}))
 
 		case ValueTyped:
@@ -127,8 +128,9 @@ func (f *Func) graph(g *graph.Graph, root graph.Vertex, includeOutput bool) grap
 		// Add all our outputs
 		for k, f := range f.output.namedValues {
 			g.AddEdge(g.Add(&valueVertex{
-				Name: k,
-				Type: f.Type,
+				Name:    k,
+				Type:    f.Type,
+				Subtype: f.Subtype,
 			}), vertex)
 		}
 		for _, f := range f.output.typedValues {
