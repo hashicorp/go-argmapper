@@ -47,14 +47,15 @@ func (v *funcVertex) String() string        { return "func: " + v.Func.fn.String
 // typedArgVertex represents a typed argument to a function. These have no
 // name and match any matching types.
 type typedArgVertex struct {
-	Name string
-	Type reflect.Type
+	Name    string
+	Type    reflect.Type
+	Subtype string
 
 	Value reflect.Value
 }
 
 func (v *typedArgVertex) Hashcode() interface{} {
-	return fmt.Sprintf("arg: %s", v.Type.String())
+	return fmt.Sprintf("arg: %s/%s", v.Type.String(), v.Subtype)
 }
 
 func (v *typedArgVertex) String() string { return v.Hashcode().(string) }
@@ -63,14 +64,15 @@ func (v *typedArgVertex) String() string { return v.Hashcode().(string) }
 // only and has no name. This can be inherited by any value with a matching
 // type.
 type typedOutputVertex struct {
-	Name string
-	Type reflect.Type
+	Name    string
+	Type    reflect.Type
+	Subtype string
 
 	Value reflect.Value
 }
 
 func (v *typedOutputVertex) Hashcode() interface{} {
-	return fmt.Sprintf("out: %s", v.Type.String())
+	return fmt.Sprintf("out: %s/%s", v.Type.String(), v.Subtype)
 }
 
 func (v *typedOutputVertex) String() string { return v.Hashcode().(string) }

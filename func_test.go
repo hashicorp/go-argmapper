@@ -452,7 +452,7 @@ func TestFunc(t *testing.T) {
 		},
 
 		//-----------------------------------------------------------
-		// TYPED INPUT WITH SUBTYPES
+		// SUBTYPES
 
 		{
 			"subtype named match",
@@ -536,6 +536,44 @@ func TestFunc(t *testing.T) {
 			},
 			[]interface{}{
 				24,
+			},
+			"",
+		},
+
+		{
+			"subtype named not specified prefers exact match",
+			func(in struct {
+				Struct
+
+				A int
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				Named("a", 24),
+				NamedSubtype("a", 36, "bar"),
+			},
+			[]interface{}{
+				24,
+			},
+			"",
+		},
+
+		{
+			"subtype type match",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly,subtype=foo"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				TypedSubtype(24, "bar"),
+				TypedSubtype(36, "foo"),
+			},
+			[]interface{}{
+				36,
 			},
 			"",
 		},

@@ -116,7 +116,8 @@ func (f *Func) graph(g *graph.Graph, root graph.Vertex, includeOutput bool) grap
 
 		case ValueTyped:
 			g.AddEdgeWeighted(vertex, g.Add(&typedArgVertex{
-				Type: val.Type,
+				Type:    val.Type,
+				Subtype: val.Subtype,
 			}), weightTyped)
 
 		default:

@@ -136,7 +136,7 @@ func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
 		result = append(result, input)
 	}
 
-	// Add our named inputs
+	// Add our named inputs with subtypes
 	for k, m := range b.namedSub {
 		for st, v := range m {
 			// Add the input
@@ -168,6 +168,24 @@ func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
 
 		// Track
 		result = append(result, input)
+	}
+
+	// Add our typed inputs with subtypes
+	for t, m := range b.typedSub {
+		for st, v := range m {
+			// Add the input
+			input := g.AddOverwrite(&typedOutputVertex{
+				Type:    t,
+				Value:   v,
+				Subtype: st,
+			})
+
+			// Input depends on the input root
+			g.AddEdge(input, root)
+
+			// Track
+			result = append(result, input)
+		}
 	}
 
 	// If we have converters, add those.

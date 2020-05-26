@@ -33,24 +33,6 @@ func (f *Func) callGraph(args *argBuilder) (
 	// we already know about. These are tracked as "vertexI".
 	vertexI = args.graph(&g, vertexRoot)
 
-	// All named values that have no subtype can take a value from
-	// any other named value that has a subtype.
-	for _, raw := range g.Vertices() {
-		v, ok := raw.(*valueVertex)
-		if !ok || v.Subtype != "" || v.Value.IsValid() {
-			continue
-		}
-
-		for _, raw := range g.Vertices() {
-			v2, ok := raw.(*valueVertex)
-			if !ok || v2.Type != v.Type || v2.Subtype == "" {
-				continue
-			}
-
-			g.AddEdgeWeighted(v, v2, weightTyped)
-		}
-	}
-
 	// Next, for all values we may have or produce, we need to create
 	// the vertices for the type-only value. This lets us say, for example,
 	// that an input "A string" satisfies anything that requires only "string".
@@ -127,9 +109,46 @@ func (f *Func) callGraph(args *argBuilder) (
 		}
 
 		g.AddEdgeWeighted(v, g.Add(&typedOutputVertex{
-			Type: v.Type,
+			Type:    v.Type,
+			Subtype: v.Subtype,
 		}), weightTyped)
 	}
+
+	// All named values that have no subtype can take a value from
+	// any other named value that has a subtype.
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*valueVertex)
+		if !ok || v.Subtype != "" || v.Value.IsValid() {
+			continue
+		}
+
+		for _, raw := range g.Vertices() {
+			v2, ok := raw.(*valueVertex)
+			if !ok || v2.Type != v.Type || v2.Subtype == "" {
+				continue
+			}
+
+			g.AddEdgeWeighted(v, v2, weightTyped)
+		}
+	}
+
+	/*
+		for _, raw := range g.Vertices() {
+			v, ok := raw.(*typedOutputVertex)
+			if !ok || v.Subtype != "" {
+				continue
+			}
+
+			for _, raw := range g.Vertices() {
+				v2, ok := raw.(*typedOutputVertex)
+				if !ok || v2.Type != v.Type || v2.Subtype == "" {
+					continue
+				}
+
+				g.AddEdgeWeighted(v, v2, weightTyped)
+			}
+		}
+	*/
 
 	log.Trace("full graph (may have cycles)", "graph", g.String())
 
