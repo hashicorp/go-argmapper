@@ -58,6 +58,9 @@ type Value struct {
 	// where the full type isn't available. This is optional. For full details
 	// on subtype matching see the package docs.
 	Subtype string
+
+	// TODO
+	Value reflect.Value
 }
 
 // ValueKind is returned by Value.Kind to designate what kind of value this is:

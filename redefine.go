@@ -86,6 +86,7 @@ func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 		Anonymous: true,
 	})
 	for k, v := range state.InputSet {
+		log.Trace("input", "value", v)
 		if _, ok := inputsProvided[k]; ok {
 			continue
 		}

@@ -14,8 +14,6 @@ import (
 // necessary to reach the target.
 type Arg func(*argBuilder) error
 
-type FilterFunc func(reflect.Type) bool
-
 type argBuilder struct {
 	logger   hclog.Logger
 	named    map[string]reflect.Value

@@ -64,13 +64,18 @@ func (f *Func) callGraph(args *argBuilder) (
 	// any valid input.
 	if args.redefining {
 		for _, raw := range g.Vertices() {
-			var typ reflect.Type
+			var value Value
 
 			// We are looking for either a value or a typed arg. Both
 			// of these represent "inputs" to a function.
 			v, ok := raw.(*valueVertex)
 			if ok {
-				typ = v.Type
+				value = Value{
+					Name:    v.Name,
+					Type:    v.Type,
+					Subtype: v.Subtype,
+					Value:   v.Value,
+				}
 			}
 			if !ok {
 				v, ok := raw.(*typedArgVertex)
@@ -78,7 +83,11 @@ func (f *Func) callGraph(args *argBuilder) (
 					continue
 				}
 
-				typ = v.Type
+				value = Value{
+					Type:    v.Type,
+					Subtype: v.Subtype,
+					Value:   v.Value,
+				}
 			}
 
 			// For redefining, the caller can setup filters to determine
@@ -86,7 +95,7 @@ func (f *Func) callGraph(args *argBuilder) (
 			// says it is possible, then we take the value.
 			include := true
 			for _, f := range args.filters {
-				if !f(typ) {
+				if !f(value) {
 					include = false
 					break
 				}
@@ -285,10 +294,15 @@ func (f *Func) reachTarget(
 			skip = v.Value.IsValid()
 		}
 
-		if !skip {
-			log.Trace("conv is missing an input", "input", out)
-			vertexT = append(vertexT, out)
+		// If we're skipping because we have this value already, then
+		// note that we're using this input in the input set.
+		if skip {
+			state.InputSet[graph.VertexID(out)] = out
+			continue
 		}
+
+		log.Trace("conv is missing an input", "input", out)
+		vertexT = append(vertexT, out)
 	}
 
 	if len(vertexT) == 0 {
