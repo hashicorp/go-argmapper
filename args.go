@@ -22,8 +22,8 @@ type argBuilder struct {
 	typedSub map[reflect.Type]map[string]reflect.Value
 	convs    []*Func
 
-	redefining bool
-	filters    []FilterFunc
+	redefining  bool
+	filterInput FilterFunc
 }
 
 func newArgBuilder(opts ...Arg) (*argBuilder, error) {
@@ -108,9 +108,12 @@ func WithConvFunc(fs ...interface{}) Arg {
 	}
 }
 
-func Filter(f FilterFunc) Arg {
+// FilterInput is used by Func.Redefine to define what inputs are valid.
+// This will replace any previously set FilterInput value. This has no effect
+// unless Func.Redefine is being called.
+func FilterInput(f FilterFunc) Arg {
 	return func(a *argBuilder) error {
-		a.filters = append(a.filters, f)
+		a.filterInput = f
 		return nil
 	}
 }

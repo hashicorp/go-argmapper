@@ -94,11 +94,9 @@ func (f *Func) callGraph(args *argBuilder) (
 			// what inputs they're capable of providing. If any filter
 			// says it is possible, then we take the value.
 			include := true
-			for _, f := range args.filters {
-				if !f(value) {
-					include = false
-					break
-				}
+			if args.filterInput != nil && !args.filterInput(value) {
+				include = false
+				break
 			}
 
 			if include {

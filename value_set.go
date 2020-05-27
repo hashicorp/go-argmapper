@@ -59,7 +59,8 @@ type Value struct {
 	// on subtype matching see the package docs.
 	Subtype string
 
-	// TODO
+	// Value is the known value. This is only ever set if using Func.Redefine
+	// with an input that was given. Otherwise, this value is invalid.
 	Value reflect.Value
 }
 

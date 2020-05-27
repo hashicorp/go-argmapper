@@ -71,7 +71,7 @@ func TestFuncRedefine(t *testing.T) {
 			[]Arg{
 				Named("a", 12),
 				WithConvFunc(func(v string) (int, error) { return strconv.Atoi(v) }),
-				Filter(func(v Value) bool { return v.Type.Kind() == reflect.String }),
+				FilterInput(func(v Value) bool { return v.Type.Kind() == reflect.String }),
 			},
 			"",
 			[]Arg{
@@ -91,7 +91,7 @@ func TestFuncRedefine(t *testing.T) {
 			},
 			[]Arg{
 				Named("a", 12),
-				Filter(func(v Value) bool { return v.Type.Kind() == reflect.String }),
+				FilterInput(func(v Value) bool { return v.Type.Kind() == reflect.String }),
 			},
 			`cannot be satisfied: "b"`,
 			[]Arg{},
