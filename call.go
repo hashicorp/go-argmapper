@@ -58,55 +58,6 @@ func (f *Func) callGraph(args *argBuilder) (
 		}), v, weightTyped)
 	}
 
-	// If we're redefining based on inputs, then we also want to
-	// go through and set a path from our input root to all the values
-	// in the graph. This lets us pick the shortest path through based on
-	// any valid input.
-	if args.redefining {
-		for _, raw := range g.Vertices() {
-			var value Value
-
-			// We are looking for either a value or a typed arg. Both
-			// of these represent "inputs" to a function.
-			v, ok := raw.(*valueVertex)
-			if ok {
-				value = Value{
-					Name:    v.Name,
-					Type:    v.Type,
-					Subtype: v.Subtype,
-					Value:   v.Value,
-				}
-			}
-			if !ok {
-				v, ok := raw.(*typedArgVertex)
-				if !ok {
-					continue
-				}
-
-				value = Value{
-					Type:    v.Type,
-					Subtype: v.Subtype,
-					Value:   v.Value,
-				}
-			}
-
-			// For redefining, the caller can setup filters to determine
-			// what inputs they're capable of providing. If any filter
-			// says it is possible, then we take the value.
-			include := true
-			if args.filterInput != nil && !args.filterInput(value) {
-				include = false
-				break
-			}
-
-			if include {
-				// Connect this to the root, since it is a potential input to
-				// satisfy a function that gets us to redefine.
-				g.AddEdge(raw, vertexRoot)
-			}
-		}
-	}
-
 	// We need to allow any typed argument to depend on a typed output.
 	// This lets two converters chain together.
 	for _, raw := range g.Vertices() {
@@ -152,6 +103,55 @@ func (f *Func) callGraph(args *argBuilder) (
 			}
 
 			g.AddEdgeWeighted(v, v2, weightTypedOtherSubtype)
+		}
+	}
+
+	// If we're redefining based on inputs, then we also want to
+	// go through and set a path from our input root to all the values
+	// in the graph. This lets us pick the shortest path through based on
+	// any valid input.
+	if args.redefining {
+		for _, raw := range g.Vertices() {
+			var value Value
+
+			// We are looking for either a value or a typed arg. Both
+			// of these represent "inputs" to a function.
+			v, ok := raw.(*valueVertex)
+			if ok {
+				value = Value{
+					Name:    v.Name,
+					Type:    v.Type,
+					Subtype: v.Subtype,
+					Value:   v.Value,
+				}
+			}
+			if !ok {
+				v, ok := raw.(*typedArgVertex)
+				if !ok {
+					continue
+				}
+
+				value = Value{
+					Type:    v.Type,
+					Subtype: v.Subtype,
+					Value:   v.Value,
+				}
+			}
+
+			// For redefining, the caller can setup filters to determine
+			// what inputs they're capable of providing. If any filter
+			// says it is possible, then we take the value.
+			include := true
+			if args.filterInput != nil && !args.filterInput(value) {
+				include = false
+				continue
+			}
+
+			if include {
+				// Connect this to the root, since it is a potential input to
+				// satisfy a function that gets us to redefine.
+				g.AddEdge(raw, vertexRoot)
+			}
 		}
 	}
 
