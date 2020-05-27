@@ -40,14 +40,6 @@ func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 	// just calling our target function and checking state.InputSet.
 	for _, v := range g.Vertices() {
 		switch v := v.(type) {
-		case *valueVertex:
-			if !v.Value.IsValid() {
-				v.Value = reflect.Zero(v.Type)
-			}
-
-		case *typedArgVertex:
-			v.Value = reflect.Zero(v.Type)
-
 		case *funcVertex:
 			// Copy the func since we're going to modify a field in it.
 			fCopy := *v.Func
@@ -68,7 +60,7 @@ func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 	// function. This will recursively reach various conversion targets
 	// as necessary.
 	state := newCallState()
-	if err := f.reachTarget(log, &g, topo, vertexF, state); err != nil {
+	if err := f.reachTarget(log, &g, topo, vertexF, state, true); err != nil {
 		return nil, err
 	}
 

@@ -266,7 +266,7 @@ func (f *Func) Call(opts ...Arg) Result {
 	// function. This will recursively reach various conversion targets
 	// as necessary.
 	state := newCallState()
-	if err := f.reachTarget(log, &g, topo, vertexF, state); err != nil {
+	if err := f.reachTarget(log, &g, topo, vertexF, state, false); err != nil {
 		return resultError(err)
 	}
 
@@ -281,6 +281,7 @@ func (f *Func) reachTarget(
 	topo graph.TopoOrder,
 	target graph.Vertex,
 	state *callState,
+	redefine bool,
 ) error {
 	// Look at the out edges, since these are the requirements for the conv
 	// and determine which inputs we need values for. If we have a value
@@ -341,6 +342,21 @@ func (f *Func) reachTarget(
 
 		// Store our input used
 		state.InputSet[graph.VertexID(paths[i][0])] = paths[i][0]
+
+		// When we're redefining, we always set the initial input to
+		// the zero value because we assume we'll have access to it. We
+		// can assume this because that is the whole definition of redefining.
+		if redefine {
+			switch v := paths[i][0].(type) {
+			case *valueVertex:
+				if !v.Value.IsValid() {
+					v.Value = reflect.Zero(v.Type)
+				}
+
+			case *typedArgVertex:
+				v.Value = reflect.Zero(v.Type)
+			}
+		}
 	}
 
 	// Go through each path
@@ -408,6 +424,7 @@ func (f *Func) reachTarget(
 					topo,
 					v,
 					state,
+					false,
 				); err != nil {
 					return err
 				}
