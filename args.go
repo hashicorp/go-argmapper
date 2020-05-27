@@ -22,8 +22,9 @@ type argBuilder struct {
 	typedSub map[reflect.Type]map[string]reflect.Value
 	convs    []*Func
 
-	redefining  bool
-	filterInput FilterFunc
+	redefining   bool
+	filterInput  FilterFunc
+	filterOutput FilterFunc
 }
 
 func newArgBuilder(opts ...Arg) (*argBuilder, error) {
@@ -114,6 +115,16 @@ func WithConvFunc(fs ...interface{}) Arg {
 func FilterInput(f FilterFunc) Arg {
 	return func(a *argBuilder) error {
 		a.filterInput = f
+		return nil
+	}
+}
+
+// FilterOutput is identical to FilterInput but for output values. If this
+// is not set, then Redefine will allow any output values. This behavior is
+// the same as if FilterInput were not specified.
+func FilterOutput(f FilterFunc) Arg {
+	return func(a *argBuilder) error {
+		a.filterOutput = f
 		return nil
 	}
 }

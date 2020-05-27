@@ -13,7 +13,15 @@ import (
 // may be incomplete, and this will return a function that only depends
 // on the missing arguments.
 //
-// filter is a filter to define what inputs
+// Redefine also allows the usage of FilterInput and FilterOutput Arg
+// values. These can be used to further restrict what values can be provided
+// as an input or returned as an output, respectively. This can be used
+// for example to try to redefine a function to only take Go primitives.
+// In the case where Filter is used, converters must be specified that
+// enable going to and from filtered values.
+//
+// If it is impossible to redefine the function according to the given
+// constraints, an error will be returned.
 func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 	builder, err := newArgBuilder(opts...)
 	if err != nil {
