@@ -70,7 +70,7 @@ func TestFuncRedefine(t *testing.T) {
 			},
 			[]Arg{
 				Named("a", 12),
-				WithConvFunc(func(v string) (int, error) { return strconv.Atoi(v) }),
+				Converter(func(v string) (int, error) { return strconv.Atoi(v) }),
 				FilterInput(func(v Value) bool { return v.Type.Kind() == reflect.String }),
 			},
 			"",

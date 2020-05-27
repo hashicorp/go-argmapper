@@ -92,9 +92,9 @@ func TypedSubtype(v interface{}, st string) Arg {
 	}
 }
 
-// WithConvFunc specifies one or more converters to use if necessary.
+// Converter specifies one or more converters to use if necessary.
 // A converter will be used if an argument type doesn't match exactly.
-func WithConvFunc(fs ...interface{}) Arg {
+func Converter(fs ...interface{}) Arg {
 	return func(a *argBuilder) error {
 		for _, f := range fs {
 			conv, err := NewFunc(f)

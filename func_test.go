@@ -198,7 +198,7 @@ func TestFunc(t *testing.T) {
 			[]Arg{
 				Named("a", 12),
 				Named("b", 2),
-				WithConvFunc(func(in int) string { return strconv.Itoa(in) }),
+				Converter(func(in int) string { return strconv.Itoa(in) }),
 			},
 			[]interface{}{"1212"},
 			"",
@@ -215,7 +215,7 @@ func TestFunc(t *testing.T) {
 			},
 			[]Arg{
 				Named("a", 12),
-				WithConvFunc(func(in int) (string, error) {
+				Converter(func(in int) (string, error) {
 					return "", fmt.Errorf("failed")
 				}),
 			},
@@ -234,7 +234,7 @@ func TestFunc(t *testing.T) {
 			},
 			[]Arg{
 				Named("a", 12),
-				WithConvFunc(func(in int) (string, error) {
+				Converter(func(in int) (string, error) {
 					return "YAY", nil
 				}),
 			},
@@ -254,7 +254,7 @@ func TestFunc(t *testing.T) {
 			[]Arg{
 				Named("a", "foo"),
 				Named("b", 2),
-				WithConvFunc(func(v string, n int) int { return len(v) + n }),
+				Converter(func(v string, n int) int { return len(v) + n }),
 			},
 			[]interface{}{"5"},
 			"",
@@ -271,8 +271,8 @@ func TestFunc(t *testing.T) {
 			},
 			[]Arg{
 				Named("input", 12),
-				WithConvFunc(func(in int) string { return strconv.Itoa(in) }),
-				WithConvFunc(func(in string) int { return len(in) }),
+				Converter(func(in int) string { return strconv.Itoa(in) }),
+				Converter(func(in string) int { return len(in) }),
 			},
 			[]interface{}{"2"},
 			"",
@@ -290,7 +290,7 @@ func TestFunc(t *testing.T) {
 			},
 			[]Arg{
 				Named("a", 12),
-				WithConvFunc(func() string { return "yes: " }),
+				Converter(func() string { return "yes: " }),
 			},
 			[]interface{}{"yes: 12"},
 			"",
@@ -307,8 +307,8 @@ func TestFunc(t *testing.T) {
 				return in.B + strconv.Itoa(in.A)
 			},
 			[]Arg{
-				WithConvFunc(func() string { return "yes: " }),
-				WithConvFunc(func() int { return 12 }),
+				Converter(func() string { return "yes: " }),
+				Converter(func() int { return 12 }),
 			},
 			[]interface{}{"yes: 12"},
 			"",
@@ -325,7 +325,7 @@ func TestFunc(t *testing.T) {
 				return in.B + strconv.Itoa(in.A)
 			},
 			[]Arg{
-				WithConvFunc(func() (string, int) { return "yes: ", 12 }),
+				Converter(func() (string, int) { return "yes: ", 12 }),
 			},
 			[]interface{}{"yes: 12"},
 			"",
@@ -345,7 +345,7 @@ func TestFunc(t *testing.T) {
 			},
 			[]Arg{
 				Named("a", 12),
-				WithConvFunc(func(s struct {
+				Converter(func(s struct {
 					Struct
 
 					A int
@@ -378,7 +378,7 @@ func TestFunc(t *testing.T) {
 			[]Arg{
 				Named("a", 12),
 				Named("b", 2),
-				WithConvFunc(func(s struct {
+				Converter(func(s struct {
 					Struct
 					C string
 				}) struct {
@@ -390,7 +390,7 @@ func TestFunc(t *testing.T) {
 						A string
 					}{A: "FOO"}
 				}),
-				WithConvFunc(func(s struct {
+				Converter(func(s struct {
 					Struct
 					C bool
 				}) struct {
@@ -402,7 +402,7 @@ func TestFunc(t *testing.T) {
 						A string
 					}{A: "FOO"}
 				}),
-				WithConvFunc(func(s struct {
+				Converter(func(s struct {
 					Struct
 					B int `argmapper:",typeOnly"`
 				}) struct {
@@ -431,7 +431,7 @@ func TestFunc(t *testing.T) {
 			[]Arg{
 				Named("a", 12),
 				Named("b", "AB"),
-				WithConvFunc(func(s struct {
+				Converter(func(s struct {
 					Struct
 					C string `argmapper:",typeOnly"`
 					D int    `argmapper:",typeOnly"`
@@ -500,7 +500,7 @@ func TestFunc(t *testing.T) {
 			},
 			[]Arg{
 				NamedSubtype("a", 24, "bar"),
-				WithConvFunc(func(s struct {
+				Converter(func(s struct {
 					Struct
 
 					A int `argmapper:",subtype=bar"`
@@ -623,7 +623,7 @@ func TestFunc(t *testing.T) {
 			},
 			[]Arg{
 				TypedSubtype(24, "bar"),
-				WithConvFunc(func(s struct {
+				Converter(func(s struct {
 					Struct
 
 					C int `argmapper:",typeOnly,subtype=bar"`
