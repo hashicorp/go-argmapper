@@ -430,9 +430,6 @@ func (f *Func) reachTarget(
 				state.TypedValue[v.Type] = v.Value
 
 			case *typedOutputVertex:
-				// Last value
-				state.Value = v.Value
-
 				// If our last node was another typed output, then we take
 				// that value.
 				if pathIdx > 0 {
@@ -442,6 +439,9 @@ func (f *Func) reachTarget(
 						v.Value = r.Value
 					}
 				}
+
+				// Last value
+				state.Value = v.Value
 
 				// Set the typed value we can read from.
 				state.TypedValue[v.Type] = v.Value

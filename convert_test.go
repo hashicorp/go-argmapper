@@ -24,6 +24,26 @@ func TestConvert(t *testing.T) {
 			(*int)(nil),
 			int(42),
 		},
+
+		{
+			"primitive to interface type",
+			[]Arg{
+				Typed("42"),
+				Converter(func(v string) testInterface { return &testInterfaceImpl{} }),
+			},
+			(*testInterface)(nil),
+			&testInterfaceImpl{},
+		},
+
+		{
+			"primitive to interface implementation",
+			[]Arg{
+				Typed("42"),
+				Converter(func(v string) *testInterfaceImpl { return &testInterfaceImpl{} }),
+			},
+			(*testInterface)(nil),
+			&testInterfaceImpl{},
+		},
 	}
 
 	for _, tt := range cases {
@@ -36,3 +56,11 @@ func TestConvert(t *testing.T) {
 		})
 	}
 }
+
+type testInterface interface {
+	error
+}
+
+type testInterfaceImpl struct{}
+
+func (*testInterfaceImpl) Error() string { return "hello" }
