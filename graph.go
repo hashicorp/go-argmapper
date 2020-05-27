@@ -79,7 +79,14 @@ func (v *typedOutputVertex) Hashcode() interface{} {
 	return fmt.Sprintf("out: %s/%s", v.Type.String(), v.Subtype)
 }
 
-func (v *typedOutputVertex) String() string { return v.Hashcode().(string) }
+func (v *typedOutputVertex) String() string {
+	str := v.Hashcode().(string)
+	if v.Value.IsValid() {
+		str += fmt.Sprintf(" (value: %v)", v.Value.Interface())
+	}
+
+	return str
+}
 
 // rootVertex tracks the root of a function call. This should have
 // in-edges only from the inputs. We use this to get a single root.

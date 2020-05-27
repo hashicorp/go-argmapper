@@ -43,7 +43,21 @@ func (r *Result) Out(i int) interface{} {
 	return r.out[i].Interface()
 }
 
-// Len returns the number of outputs.
+// Len returns the number of outputs, excluding any final error output.
 func (r *Result) Len() int {
-	return len(r.out)
+	result := len(r.out)
+	if r.hasError() {
+		result -= 1
+	}
+
+	return result
+}
+
+func (r *Result) hasError() bool {
+	if len(r.out) == 0 {
+		return false
+	}
+
+	final := r.out[len(r.out)-1]
+	return final.Type() == errType
 }

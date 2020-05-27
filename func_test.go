@@ -60,6 +60,24 @@ func TestFunc(t *testing.T) {
 		},
 
 		{
+			"basic matching with interface implementation",
+			func(in struct {
+				Struct
+
+				A error
+			}) (int, error) {
+				return strconv.Atoi(in.A.Error())
+			},
+			[]Arg{
+				Typed(fmt.Errorf("42")),
+			},
+			[]interface{}{
+				42,
+			},
+			"",
+		},
+
+		{
 			"missing argument",
 			func(in struct {
 				Struct

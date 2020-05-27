@@ -72,6 +72,28 @@ func (f *Func) callGraph(args *argBuilder) (
 		}), weightTyped)
 	}
 
+	// Typed output vertices that are interfaces can be satisfied by
+	// interface implementations. i.e. `out: error` -> `out: *fmt.Error`.
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*typedOutputVertex)
+		if !ok || v.Type.Kind() != reflect.Interface {
+			continue
+		}
+
+		for _, raw2 := range g.Vertices() {
+			if raw == raw2 {
+				continue
+			}
+
+			v2, ok := raw2.(*typedOutputVertex)
+			if !ok || !v2.Type.Implements(v.Type) {
+				continue
+			}
+
+			g.AddEdgeWeighted(v, v2, weightTyped)
+		}
+	}
+
 	// All named values that have no subtype can take a value from
 	// any other named value that has a subtype.
 	for _, raw := range g.Vertices() {
@@ -410,6 +432,16 @@ func (f *Func) reachTarget(
 			case *typedOutputVertex:
 				// Last value
 				state.Value = v.Value
+
+				// If our last node was another typed output, then we take
+				// that value.
+				if pathIdx > 0 {
+					prev := path[pathIdx-1]
+					if r, ok := prev.(*typedOutputVertex); ok {
+						log.Trace("setting node value", "value", r.Value)
+						v.Value = r.Value
+					}
+				}
 
 				// Set the typed value we can read from.
 				state.TypedValue[v.Type] = v.Value
