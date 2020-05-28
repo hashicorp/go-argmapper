@@ -2,6 +2,7 @@ package argmapper
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,7 +15,7 @@ func init() {
 	hclog.L().SetLevel(hclog.Trace)
 }
 
-func TestFunc(t *testing.T) {
+func TestFuncCall(t *testing.T) {
 	cases := []struct {
 		Name     string
 		Callback interface{}
@@ -705,4 +706,39 @@ func TestFunc(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildFunc(t *testing.T) {
+	require := require.New(t)
+
+	intType := reflect.TypeOf(int(0))
+
+	input, err := NewValueSet([]Value{
+		Value{
+			Name: "a",
+			Type: intType,
+		},
+	})
+	require.NoError(err)
+
+	output, err := NewValueSet([]Value{
+		Value{
+			Type: intType,
+		},
+	})
+	require.NoError(err)
+
+	f, err := BuildFunc(input, output, func(in, out *ValueSet) error {
+		// Double
+		result := in.Named("a").Value.Interface().(int) * 2
+
+		// Set the result
+		out.Typed(intType).Value = reflect.ValueOf(result)
+
+		return nil
+	})
+	require.NoError(err)
+
+	require.NoError(output.FromResult(f.Call(Named("a", 12))))
+	require.Equal(24, output.Typed(intType).Value.Interface())
 }

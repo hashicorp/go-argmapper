@@ -5,6 +5,8 @@ import "reflect"
 // Result is returned from a Call with the results of the function call.
 // This structure lets you access multiple results.
 type Result struct {
+	*ValueSet
+
 	out      []reflect.Value
 	buildErr error
 }

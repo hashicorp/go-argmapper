@@ -22,9 +22,9 @@ type ValueSet struct {
 	// values is the set of values that this ValueSet contains. namedValues,
 	// typedValues, etc. are convenience maps for looking up values more
 	// easily.
-	values      []Value
-	namedValues map[string]Value
-	typedValues map[reflect.Type]Value
+	values      []*Value
+	namedValues map[string]*Value
+	typedValues map[reflect.Type]*Value
 
 	// isLifted is if this represents a lifted struct. A lifted struct
 	// is one where we automatically converted flat argument lists to
@@ -79,6 +79,55 @@ type valueInternal struct {
 	index int
 }
 
+func NewValueSet(vs []Value) (*ValueSet, error) {
+	// Build a dynamic struct based on the value list. The struct is
+	// only used for input/output mapping.
+	var sf []reflect.StructField
+	sf = append(sf, reflect.StructField{
+		Name:      "Struct",
+		Type:      structMarkerType,
+		Anonymous: true,
+	})
+	for i, v := range vs {
+		if isStruct(v.Type) {
+			return nil, fmt.Errorf("can't have argmapper.Struct values with custom ValueSet building")
+		}
+
+		// TODO(mitchellh): error on duplicate names, types
+
+		// Build our tag.
+		tags := []string{""}
+		if v.Name == "" {
+			tags = append(tags, "typeOnly")
+		}
+		if v.Subtype != "" {
+			tags = append(tags, fmt.Sprintf("subtype=%s", v.Subtype))
+		}
+		tag := reflect.StructTag(fmt.Sprintf(`argmapper:"%s"`, strings.Join(tags, ",")))
+
+		switch v.Kind() {
+		case ValueNamed:
+			sf = append(sf, reflect.StructField{
+				Name: strings.ToUpper(v.Name),
+				Type: v.Type,
+				Tag:  tag,
+			})
+
+		case ValueTyped:
+			sf = append(sf, reflect.StructField{
+				Name: fmt.Sprintf("V__Type_%d", i),
+				Type: v.Type,
+				Tag:  tag,
+			})
+
+		default:
+			panic("unknown kind")
+		}
+	}
+
+	return newValueSetFromStruct(reflect.StructOf(sf))
+}
+
 func newValueSet(count int, get func(int) reflect.Type) (*ValueSet, error) {
 	// If there are no arguments, then return an empty value set.
 	if count == 0 {
@@ -126,9 +175,9 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 	// We will accumulate our results here
 	result := &ValueSet{
 		structType:  typ,
-		values:      []Value{},
-		namedValues: map[string]Value{},
-		typedValues: map[reflect.Type]Value{},
+		values:      []*Value{},
+		namedValues: map[string]*Value{},
+		typedValues: map[reflect.Type]*Value{},
 	}
 
 	// Go through the fields and record them all
@@ -182,22 +231,107 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 			},
 		}
 
-		result.values = append(result.values, value)
+		result.values = append(result.values, &value)
 		switch value.Kind() {
 		case ValueNamed:
-			result.namedValues[value.Name] = value
+			result.namedValues[value.Name] = &value
 
 		case ValueTyped:
-			result.typedValues[value.Type] = value
+			result.typedValues[value.Type] = &value
 		}
 	}
 
 	return result, nil
 }
 
-// Values returns the values in this ValueSet. This result is not mutable.
+// Values returns the values in this ValueSet.
 func (t *ValueSet) Values() []Value {
-	return t.values
+	result := make([]Value, len(t.values))
+	for i, v := range t.values {
+		result[i] = *v
+	}
+	return result
+}
+
+func (vs *ValueSet) Named(n string) *Value {
+	return vs.namedValues[n]
+}
+
+func (vs *ValueSet) Typed(t reflect.Type) *Value {
+	return vs.typedValues[t]
+}
+
+// Signature returns the type signature that this ValueSet will map to/from.
+// This is used for making dynamic types with reflect.FuncOf to take or return
+// this valueset.
+func (vs *ValueSet) Signature() []reflect.Type {
+	if !vs.lifted() {
+		return []reflect.Type{vs.structType}
+	}
+
+	result := make([]reflect.Type, len(vs.typedValues))
+	for _, v := range vs.typedValues {
+		result[v.index] = v.Type
+	}
+
+	return result
+}
+
+func (vs *ValueSet) SignatureValues() []reflect.Value {
+	// If typ is nil then there is no values
+	if vs.structType == nil {
+		return nil
+	}
+
+	// If we're lifted, we just return directly based on values
+	if vs.lifted() {
+		result := make([]reflect.Value, len(vs.typedValues))
+		for _, v := range vs.typedValues {
+			result[v.index] = v.Value
+		}
+
+		return result
+	}
+
+	// Not lifted, meaning we return a struct
+	structOut := reflect.New(vs.structType).Elem()
+	for _, f := range vs.values {
+		structOut.Field(f.index).Set(f.Value)
+	}
+
+	return []reflect.Value{structOut}
+}
+
+// FromSignature sets the values in this ValueSet based on the values list.
+// The values list must match the type signature returned from vs.Signature.
+func (vs *ValueSet) FromSignature(values []reflect.Value) error {
+	// If we're lifted, then first set the values onto the struct.
+	if vs.lifted() {
+		// If we are lifted, then we need to translate the output arguments
+		// to their proper types in a struct.
+		structOut := reflect.New(vs.structType).Elem()
+		for _, f := range vs.typedValues {
+			structOut.Field(f.index).Set(values[f.index])
+		}
+
+		values = []reflect.Value{structOut}
+	}
+
+	// Get our first result which should be our struct
+	structVal := values[0]
+	for i, v := range vs.values {
+		vs.values[i].Value = structVal.Field(v.index)
+	}
+
+	return nil
+}
+
+func (vs *ValueSet) FromResult(r Result) error {
+	if err := r.Err(); err != nil {
+		return err
+	}
+
+	return vs.FromSignature(r.out)
 }
 
 // Func returns a new Func that calls back into f with the values it receives
@@ -242,6 +376,21 @@ func (t *ValueSet) result(r Result) Result {
 
 	r.out = []reflect.Value{structOut}
 	return r
+}
+
+// Arg returns an Arg that can be used with Func.Call to send this value.
+// This only works if the Value's Value field is set.
+func (v *Value) Arg() Arg {
+	switch v.Kind() {
+	case ValueNamed:
+		return NamedSubtype(v.Name, v.Value, v.Subtype)
+
+	case ValueTyped:
+		return TypedSubtype(v.Value, v.Subtype)
+
+	default:
+		panic("unknown kind: " + v.Kind().String())
+	}
 }
 
 func (v *Value) Kind() ValueKind {

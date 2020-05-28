@@ -58,6 +58,10 @@ func Named(n string, v interface{}) Arg {
 
 // NamedSubtype is the same as Named but specifies a subtype for the value.
 func NamedSubtype(n string, v interface{}, st string) Arg {
+	if st == "" {
+		return Named(n, v)
+	}
+
 	return func(a *argBuilder) error {
 		n = strings.ToLower(n)
 		if a.namedSub[n] == nil {
@@ -81,6 +85,10 @@ func Typed(v interface{}) Arg {
 
 // TypedSubtype is the same as Typed but specifies a subtype key for the value.
 func TypedSubtype(v interface{}, st string) Arg {
+	if st == "" {
+		return Typed(v)
+	}
+
 	return func(a *argBuilder) error {
 		rv := reflect.ValueOf(v)
 		rt := rv.Type()

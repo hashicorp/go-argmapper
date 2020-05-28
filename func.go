@@ -78,6 +78,33 @@ func NewFunc(f interface{}) (*Func, error) {
 	}, nil
 }
 
+// BuildFunc builds a function based on the specified input and output
+// value sets. When called, this will call the cb with a valueset matching
+// input and output with the argument values set. The cb should return
+// a populated ValueSet.
+func BuildFunc(input, output *ValueSet, cb func(in, out *ValueSet) error) (*Func, error) {
+	// Make our function type.
+	funcType := reflect.FuncOf(
+		input.Signature(),
+		append(output.Signature(), errType), // append error so we can return errors
+		false,
+	)
+
+	// Build our function
+	return NewFunc(reflect.MakeFunc(funcType, func(vs []reflect.Value) []reflect.Value {
+		// Set our input
+		if err := input.FromSignature(vs); err != nil {
+			panic(err)
+		}
+		// Call
+		if err := cb(input, output); err != nil {
+			panic(err)
+		}
+
+		return append(output.SignatureValues(), reflect.Zero(errType))
+	}).Interface())
+}
+
 // Input returns the input ValueSet for this function, representing the values
 // that this function requires as input.
 func (f *Func) Input() *ValueSet { return f.input }
