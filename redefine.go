@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
@@ -20,11 +21,20 @@ import (
 // In the case where Filter is used, converters must be specified that
 // enable going to and from filtered values.
 //
+// Currently, FilterOutput will just return an error if the functions
+// outputs don't match what is expected. In the future, we plan on enabling
+// FilterOutput to also map through converters to return the desired matches.
+//
 // If it is impossible to redefine the function according to the given
 // constraints, an error will be returned.
 func (f *Func) Redefine(opts ...Arg) (*Func, error) {
-	// First we redefine our inputs to get the struct type that we'll take
-	// in the new function.
+	// First we check the outputs since we currently only error if the outputs
+	// do not match the filter. In the future, we'll do conversions here too.
+	if err := f.redefineOutputs(opts...); err != nil {
+		return nil, err
+	}
+
+	// Redefine our inputs to get the struct type that we'll take in the new function.
 	inputStruct, err := f.redefineInputs(opts...)
 	if err != nil {
 		return nil, err
@@ -178,6 +188,32 @@ func (f *Func) redefineInputs(opts ...Arg) (reflect.Type, error) {
 	}
 
 	return reflect.StructOf(sf), nil
+}
+
+// redefineOutputs redefines the outputs of the function in accordance
+// with FilterOutput.
+//
+// NOTE(mitchellh): today, we just validate the outputs. In the future,
+// we'll chain converters to reach a desired output.
+func (f *Func) redefineOutputs(opts ...Arg) error {
+	builder, err := newArgBuilder(opts...)
+	if err != nil {
+		return err
+	}
+
+	if builder.filterOutput == nil {
+		return nil
+	}
+
+	err = nil
+	for _, v := range f.Output().Values() {
+		if !builder.filterOutput(v) {
+			err = multierror.Append(err, fmt.Errorf(
+				"output %s does not satisfy output filter", v.String()))
+		}
+	}
+
+	return err
 }
 
 // zeroFunc returns a function implementation that outputs the zero

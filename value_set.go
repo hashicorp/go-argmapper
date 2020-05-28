@@ -252,6 +252,19 @@ func (v *Value) Kind() ValueKind {
 	return ValueTyped
 }
 
+func (v *Value) String() string {
+	switch v.Kind() {
+	case ValueNamed:
+		return fmt.Sprintf("%q (type: %s)", v.Name, v.Type)
+
+	case ValueTyped:
+		return fmt.Sprintf("type %s", v.Type)
+
+	default:
+		return fmt.Sprintf("%#v", v)
+	}
+}
+
 type structValue struct {
 	typ   *ValueSet
 	value reflect.Value

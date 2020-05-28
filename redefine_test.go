@@ -59,6 +59,9 @@ func TestFuncRedefine(t *testing.T) {
 			[]interface{}{36},
 		},
 
+		//-----------------------------------------------------------
+		// FILTER INPUT
+
 		{
 			"only through strings",
 			func(in struct {
@@ -95,6 +98,47 @@ func TestFuncRedefine(t *testing.T) {
 			},
 			`cannot be satisfied: "b"`,
 			[]Arg{},
+			nil,
+		},
+
+		//-----------------------------------------------------------
+		// FILTER OUTPUT
+
+		{
+			"satisfy output type",
+			func(in struct {
+				Struct
+
+				A, B int
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 24),
+				FilterOutput(FilterType(reflect.TypeOf(int(0)))),
+			},
+			"",
+			[]Arg{},
+			[]interface{}{36},
+		},
+
+		{
+			"fail to satisfy output type",
+			func(in struct {
+				Struct
+
+				A, B int
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 24),
+				FilterOutput(FilterType(reflect.TypeOf(string("")))),
+			},
+			"output type int",
+			nil,
 			nil,
 		},
 	}
