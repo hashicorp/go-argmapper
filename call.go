@@ -180,6 +180,18 @@ func (f *Func) callGraph(args *argBuilder) (
 
 	log.Trace("full graph (may have cycles)", "graph", g.String())
 
+	// Go through all the things we can access from our root, which are
+	// things that we can provide directly, and remove any out edges
+	// that are NOT root. If we can provide it directly, we don't rely
+	// on anything else, and this removes cycles.
+	for _, raw := range g.InEdges(vertexRoot) {
+		for _, v := range g.OutEdges(raw) {
+			if v != vertexRoot {
+				g.RemoveEdge(raw, v)
+			}
+		}
+	}
+
 	// TODO: explain why
 	for _, raw := range g.Vertices() {
 		v, ok := raw.(*typedArgVertex)

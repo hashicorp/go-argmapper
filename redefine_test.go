@@ -106,6 +106,31 @@ func TestFuncRedefine(t *testing.T) {
 		},
 
 		{
+			"input with two possible converters",
+			func(in struct {
+				Struct
+
+				A, B int
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				Named("a", 12),
+				Converter(func(v string) (int, error) { return strconv.Atoi(v) }),
+				Converter(func(v []byte) string { return string(v) }),
+				Converter(func(v string) []byte { return []byte(v) }),
+				FilterInput(FilterOr(
+					FilterType(reflect.TypeOf("")),
+				)),
+			},
+			"",
+			[]Arg{
+				Typed("24"),
+			},
+			[]interface{}{36},
+		},
+
+		{
 			"unsatisfiable",
 			func(in struct {
 				Struct
