@@ -1,5 +1,7 @@
 package graph
 
+import "fmt"
+
 // KahnSort will return the topological sort of the graph using Kahn's algorithm.
 // The graph must not have any cycles or this will panic.
 func (g *Graph) KahnSort() TopoOrder {
@@ -61,7 +63,10 @@ func (g *Graph) KahnSort() TopoOrder {
 	//   return error   (graph has at least one cycle)
 	for _, out := range g.adjacencyOut {
 		if len(out) > 0 {
-			panic("graph has cycles")
+			// We have cycles, so let's do cycle detection to give a better
+			// error message.
+			cycles := g.Cycles()
+			panic(fmt.Sprintf("graph has cycles: %v", cycles))
 		}
 	}
 
