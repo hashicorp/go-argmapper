@@ -401,6 +401,20 @@ func TestFuncCall(t *testing.T) {
 			"",
 		},
 
+		{
+			"unnecessary converters",
+			func(ctx context.Context, v string) string { return v },
+			[]Arg{
+				Typed(context.Background()),
+				Typed(42),
+				Converter(func(v int) string { return strconv.Itoa(v) }),
+				Converter(func(context.Context, []byte) string { return "" }),
+				Converter(func(context.Context, string) []byte { return []byte("") }),
+			},
+			[]interface{}{"42"},
+			"",
+		},
+
 		//-----------------------------------------------------------
 		// TYPE CONVERTER STRUCTS
 

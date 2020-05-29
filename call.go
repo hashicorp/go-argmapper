@@ -240,6 +240,29 @@ func (f *Func) callGraph(args *argBuilder) (
 		}
 	}
 
+	// Do a shortest path search from our function to each of our
+	// root dependents (typically inputs). We discard any functions that
+	// we don't touch. This assists in removing cycles for converters we'll
+	// never call. See the "unnecessary converters" test case.
+	_, edgeTo := g.Dijkstra(vertexF)
+	visited := map[interface{}]struct{}{}
+	for _, v := range g.InEdges(vertexRoot) {
+		for _, v := range g.EdgeToPath(v, edgeTo) {
+			if _, ok := v.(*funcVertex); ok {
+				visited[graph.VertexID(v)] = struct{}{}
+			}
+		}
+	}
+	for _, v := range g.Vertices() {
+		if _, ok := v.(*funcVertex); !ok {
+			continue
+		}
+		if _, ok := visited[graph.VertexID(v)]; !ok {
+			g.Remove(v)
+		}
+	}
+	log.Trace("graph after unused function prune", "graph", g.String())
+
 	// Next we do a DFS from each input A in I to the function F.
 	// This gives us the full set of reachable nodes from our inputs
 	// and at most to F. Using this information, we can prune any nodes
@@ -249,7 +272,7 @@ func (f *Func) callGraph(args *argBuilder) (
 	// graph here because we typically have out edges pointing to
 	// requirements, but we're going from requirements (inputs) to
 	// the function.
-	visited := map[interface{}]struct{}{
+	visited = map[interface{}]struct{}{
 		// We must keep the root. Since we're starting from the root we don't
 		// "visit" it. But we must keep it for shortest path calculations. If
 		// we don't keep it, our shortest path calculations are from some
