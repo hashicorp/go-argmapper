@@ -114,6 +114,11 @@ func (f *Func) Input() *ValueSet { return f.input }
 // that this function produces as an output.
 func (f *Func) Output() *ValueSet { return f.output }
 
+// Func returns the function pointer that this Func is built around.
+func (f *Func) Func() interface{} {
+	return f.fn.Interface()
+}
+
 // graph adds this function to the graph. The given root should be a single
 // shared root to the graph, typically a rootVertex. This returns the
 // funcVertex created.
