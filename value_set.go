@@ -247,9 +247,15 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 	return result, nil
 }
 
-// Values returns the values in this ValueSet. This should not be modified.
-func (vs *ValueSet) Values() []*Value {
-	return vs.values
+// Values returns the values in this ValueSet. This does not return
+// pointers so any modifications to the values will not impact any values
+// in this set. Please call Named, Typed, etc. directly to make modifications.
+func (vs *ValueSet) Values() []Value {
+	result := make([]Value, len(vs.values))
+	for i, v := range vs.values {
+		result[i] = *v
+	}
+	return result
 }
 
 // Named returns a pointer to the value with the given name, or nil if

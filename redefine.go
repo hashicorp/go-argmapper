@@ -207,7 +207,7 @@ func (f *Func) redefineOutputs(opts ...Arg) error {
 
 	err = nil
 	for _, v := range f.Output().Values() {
-		if !builder.filterOutput(*v) {
+		if !builder.filterOutput(v) {
 			err = multierror.Append(err, fmt.Errorf(
 				"output %s does not satisfy output filter", v.String()))
 		}
