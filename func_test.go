@@ -235,6 +235,46 @@ func TestFuncCall(t *testing.T) {
 		},
 
 		{
+			"type converter both ways",
+			func(in struct {
+				Struct
+
+				A string
+				B int
+			}) string {
+				return strings.Repeat(in.A, in.B)
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 2),
+				Converter(func(in int) string { return strconv.Itoa(in) }),
+				Converter(func(in string) (int, error) { return strconv.Atoi(in) }),
+			},
+			[]interface{}{"1212"},
+			"",
+		},
+
+		{
+			"type converter both ways, execute both",
+			func(in struct {
+				Struct
+
+				A string
+				B int
+			}) string {
+				return strings.Repeat(in.A, in.B)
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", "2"),
+				Converter(func(in int) string { return strconv.Itoa(in) }),
+				Converter(func(in string) (int, error) { return strconv.Atoi(in) }),
+			},
+			[]interface{}{"1212"},
+			"",
+		},
+
+		{
 			"type converter with an error",
 			func(in struct {
 				Struct
