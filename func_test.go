@@ -716,6 +716,39 @@ func TestFuncCall(t *testing.T) {
 		},
 
 		{
+			"subtype type conversion inherits subtype",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly,subtype=foo"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				TypedSubtype("value", "bar"),
+				Converter(func(s struct {
+					Struct
+
+					C string `argmapper:",typeOnly"`
+				}) struct {
+					Struct
+
+					D int `argmapper:",typeOnly"`
+				} {
+					return struct {
+						Struct
+
+						D int `argmapper:",typeOnly"`
+					}{D: 42}
+				}),
+			},
+			[]interface{}{
+				42,
+			},
+			"",
+		},
+
+		{
 			"subtype type matching named",
 			func(in struct {
 				Struct

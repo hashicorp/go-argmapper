@@ -112,6 +112,8 @@ func (f *Func) callGraph(args *argBuilder) (
 		}
 	}
 
+	// All typed values that have no subtype can take a value from
+	// any output with a subtype.
 	for _, raw := range g.Vertices() {
 		v, ok := raw.(*typedArgVertex)
 		if !ok || v.Subtype != "" {
@@ -121,6 +123,24 @@ func (f *Func) callGraph(args *argBuilder) (
 		for _, raw := range g.Vertices() {
 			v2, ok := raw.(*typedOutputVertex)
 			if !ok || v2.Type != v.Type || v2.Subtype == "" {
+				continue
+			}
+
+			g.AddEdgeWeighted(v, v2, weightTypedOtherSubtype)
+		}
+	}
+
+	// All typed values that have no subtype can take a value from
+	// any output with a subtype.
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*typedArgVertex)
+		if !ok || v.Subtype == "" {
+			continue
+		}
+
+		for _, raw := range g.Vertices() {
+			v2, ok := raw.(*typedOutputVertex)
+			if !ok || v2.Type != v.Type || v2.Subtype != "" {
 				continue
 			}
 
