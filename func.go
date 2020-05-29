@@ -96,6 +96,7 @@ func BuildFunc(input, output *ValueSet, cb func(in, out *ValueSet) error) (*Func
 		if err := input.FromSignature(vs); err != nil {
 			panic(err)
 		}
+
 		// Call
 		if err := cb(input, output); err != nil {
 			panic(err)

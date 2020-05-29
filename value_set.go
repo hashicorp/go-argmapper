@@ -79,6 +79,9 @@ type valueInternal struct {
 	index int
 }
 
+// NewValueSet creates a ValueSet from a list of expected values.
+//
+// This is primarily used alongside BuildFunc to dynamically build a Func.
 func NewValueSet(vs []Value) (*ValueSet, error) {
 	// Build a dynamic struct based on the value list. The struct is
 	// only used for input/output mapping.
@@ -244,21 +247,36 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 	return result, nil
 }
 
-// Values returns the values in this ValueSet.
-func (t *ValueSet) Values() []Value {
-	result := make([]Value, len(t.values))
-	for i, v := range t.values {
-		result[i] = *v
-	}
-	return result
+// Values returns the values in this ValueSet. This should not be modified.
+func (vs *ValueSet) Values() []*Value {
+	return vs.values
 }
 
+// Named returns a pointer to the value with the given name, or nil if
+// it doesn't exist.
 func (vs *ValueSet) Named(n string) *Value {
 	return vs.namedValues[n]
 }
 
+// Typed returns a pointer to the value with the given type, or nil
+// if it doesn't exist. If there is no typed value directly, a random
+// type with the matching subtype will be chosen. If you want an exact
+// match with no subtype, use TypedSubtype.
 func (vs *ValueSet) Typed(t reflect.Type) *Value {
+	// TODO: subtype
 	return vs.typedValues[t]
+}
+
+// TypedSubtype returns a pointer to the value that matches the type
+// and subtype exactly.
+func (vs *ValueSet) TypedSubtype(t reflect.Type, st string) *Value {
+	for _, v := range vs.values {
+		if v.Type == t && v.Subtype == st {
+			return v
+		}
+	}
+
+	return nil
 }
 
 // Signature returns the type signature that this ValueSet will map to/from.
@@ -277,6 +295,9 @@ func (vs *ValueSet) Signature() []reflect.Type {
 	return result
 }
 
+// SignatureValues returns the values that match the Signature type list,
+// based on the values set in this set. If a value isn't set, the zero
+// value is used.
 func (vs *ValueSet) SignatureValues() []reflect.Value {
 	// If typ is nil then there is no values
 	if vs.structType == nil {
@@ -287,7 +308,7 @@ func (vs *ValueSet) SignatureValues() []reflect.Value {
 	if vs.lifted() {
 		result := make([]reflect.Value, len(vs.typedValues))
 		for _, v := range vs.typedValues {
-			result[v.index] = v.Value
+			result[v.index] = v.valueOrZero()
 		}
 
 		return result
@@ -296,7 +317,7 @@ func (vs *ValueSet) SignatureValues() []reflect.Value {
 	// Not lifted, meaning we return a struct
 	structOut := reflect.New(vs.structType).Elem()
 	for _, f := range vs.values {
-		structOut.Field(f.index).Set(f.Value)
+		structOut.Field(f.index).Set(f.valueOrZero())
 	}
 
 	return []reflect.Value{structOut}
@@ -304,6 +325,7 @@ func (vs *ValueSet) SignatureValues() []reflect.Value {
 
 // FromSignature sets the values in this ValueSet based on the values list.
 // The values list must match the type signature returned from vs.Signature.
+// This usually comes from calling a function directly.
 func (vs *ValueSet) FromSignature(values []reflect.Value) error {
 	// If we're lifted, then first set the values onto the struct.
 	if vs.lifted() {
@@ -326,6 +348,8 @@ func (vs *ValueSet) FromSignature(values []reflect.Value) error {
 	return nil
 }
 
+// FromResult sets the values in this set based on a Result. This will
+// return an error if the result represents an error.
 func (vs *ValueSet) FromResult(r Result) error {
 	if err := r.Err(); err != nil {
 		return err
@@ -334,14 +358,8 @@ func (vs *ValueSet) FromResult(r Result) error {
 	return vs.FromSignature(r.out)
 }
 
-// Func returns a new Func that calls back into f with the values it receives
-// when it is called.
-func (t *ValueSet) Func(f func(vs map[Value]interface{}) error) (*Func, error) {
-	return nil, nil
-}
-
 // New returns a new structValue that can be used for value population.
-func (t *ValueSet) New() *structValue {
+func (t *ValueSet) newStructValue() *structValue {
 	result := &structValue{typ: t}
 	if t.structType != nil {
 		result.value = reflect.New(t.structType).Elem()
@@ -393,6 +411,7 @@ func (v *Value) Arg() Arg {
 	}
 }
 
+// Kind returns the ValueKind that this Value represents.
 func (v *Value) Kind() ValueKind {
 	if v.Name != "" {
 		return ValueNamed
@@ -412,6 +431,14 @@ func (v *Value) String() string {
 	default:
 		return fmt.Sprintf("%#v", v)
 	}
+}
+
+func (v *Value) valueOrZero() reflect.Value {
+	if !v.Value.IsValid() {
+		return reflect.Zero(v.Type)
+	}
+
+	return v.Value
 }
 
 type structValue struct {

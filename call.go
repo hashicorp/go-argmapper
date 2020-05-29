@@ -490,7 +490,7 @@ func (f *Func) reachTarget(
 func (f *Func) callDirect(log hclog.Logger, state *callState) Result {
 	// Initialize the struct we'll be populating
 	var buildErr error
-	structVal := f.input.New()
+	structVal := f.input.newStructValue()
 	for _, val := range f.input.values {
 		switch val.Kind() {
 		case ValueNamed:

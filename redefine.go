@@ -207,7 +207,7 @@ func (f *Func) redefineOutputs(opts ...Arg) error {
 
 	err = nil
 	for _, v := range f.Output().Values() {
-		if !builder.filterOutput(v) {
+		if !builder.filterOutput(*v) {
 			err = multierror.Append(err, fmt.Errorf(
 				"output %s does not satisfy output filter", v.String()))
 		}
@@ -224,7 +224,7 @@ func (f *Func) zeroFunc() reflect.Value {
 	fn := f.fn.Type()
 	return reflect.MakeFunc(fn, func(args []reflect.Value) []reflect.Value {
 		// Create our struct type and set all the fields to zero
-		v := t.New()
+		v := t.newStructValue()
 		for _, f := range t.namedValues {
 			v.Field(f.index).Set(reflect.Zero(f.Type))
 		}
