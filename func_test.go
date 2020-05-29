@@ -749,6 +749,52 @@ func TestFuncCall(t *testing.T) {
 		},
 
 		{
+			"subtype type conversion generated",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly,subtype=foo"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				TypedSubtype("foo", "bar"),
+				ConverterGen(func(v Value) (*Func, error) {
+					// We only want strings
+					if v.Type != reflect.TypeOf("") {
+						return nil, nil
+					}
+
+					// We take this value as our input.
+					inputSet, err := NewValueSet([]Value{v})
+					if err != nil {
+						return nil, err
+					}
+
+					// Generate an int with the subtype of the string value
+					outputSet, err := NewValueSet([]Value{Value{
+						Name:    v.Name,
+						Type:    reflect.TypeOf(int(0)),
+						Subtype: v.Value.Interface().(string),
+					}})
+					if err != nil {
+						return nil, err
+					}
+
+					return BuildFunc(inputSet, outputSet, func(in, out *ValueSet) error {
+						outputSet.Typed(reflect.TypeOf(int(0))).Value =
+							reflect.ValueOf(42)
+						return nil
+					})
+				}),
+			},
+			[]interface{}{
+				42,
+			},
+			"",
+		},
+
+		{
 			"subtype type matching named",
 			func(in struct {
 				Struct

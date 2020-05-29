@@ -21,6 +21,7 @@ type argBuilder struct {
 	typed    map[reflect.Type]reflect.Value
 	typedSub map[reflect.Type]map[string]reflect.Value
 	convs    []*Func
+	convGens []ConverterGenFunc
 
 	redefining   bool
 	filterInput  FilterFunc
@@ -128,6 +129,25 @@ func ConverterFunc(fs ...*Func) Arg {
 			}
 		}
 
+		return nil
+	}
+}
+
+// ConverterGenFunc is called with a value and should return a non-nil Func
+// if it is able to generate a converter on the fly based on this value.
+type ConverterGenFunc func(Value) (*Func, error)
+
+// ConverterGen registers a converter generator. A converter generator
+// generates a converter dynamically based on some set values. This can be
+// used to generate type conversions for example. The returned func can
+// have more requirements.
+//
+// If the function returns a nil Func, then no converter is generated.
+func ConverterGen(fs ...ConverterGenFunc) Arg {
+	return func(a *argBuilder) error {
+		for _, f := range fs {
+			a.convGens = append(a.convGens, f)
+		}
 		return nil
 	}
 }
@@ -241,5 +261,30 @@ func (b *argBuilder) graph(log hclog.Logger, g *graph.Graph, root graph.Vertex) 
 		f.graph(g, root, true)
 	}
 
+	// If we have converter generators, run those.
+	if len(b.convGens) > 0 {
+		for _, vertex := range g.Vertices() {
+			// Get a value. If this vertex can't be represented by a value,
+			// then ignore it.
+			value := newValueFromVertex(vertex)
+			if value == nil {
+				continue
+			}
+
+			// Go through each generator and create the converter.
+			for _, gen := range b.convGens {
+				f, err := gen(*value)
+				if err != nil {
+					// TODO: return
+					panic(err)
+				}
+				if f == nil {
+					continue
+				}
+
+				f.graph(g, root, true)
+			}
+		}
+	}
 	return result
 }

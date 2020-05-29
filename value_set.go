@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
 //go:generate stringer -type=ValueKind
@@ -400,6 +402,27 @@ func (t *ValueSet) result(r Result) Result {
 
 	r.out = []reflect.Value{structOut}
 	return r
+}
+
+func newValueFromVertex(v graph.Vertex) *Value {
+	switch v := v.(type) {
+	case *valueVertex:
+		return &Value{
+			Name:    v.Name,
+			Type:    v.Type,
+			Subtype: v.Subtype,
+			Value:   v.Value,
+		}
+
+	case *typedOutputVertex:
+		return &Value{
+			Type:    v.Type,
+			Subtype: v.Subtype,
+			Value:   v.Value,
+		}
+	}
+
+	return nil
 }
 
 // Arg returns an Arg that can be used with Func.Call to send this value.
