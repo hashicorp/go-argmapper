@@ -63,7 +63,7 @@ func TestFuncRedefine(t *testing.T) {
 		// FILTER INPUT
 
 		{
-			"only through strings",
+			"only through strings direct",
 			func(in struct {
 				Struct
 
@@ -74,6 +74,28 @@ func TestFuncRedefine(t *testing.T) {
 			[]Arg{
 				Named("a", 12),
 				Converter(func(v string) (int, error) { return strconv.Atoi(v) }),
+				FilterInput(func(v Value) bool { return v.Type.Kind() == reflect.String }),
+			},
+			"",
+			[]Arg{
+				Typed("24"),
+			},
+			[]interface{}{36},
+		},
+
+		{
+			"only through strings with bidirectional converter",
+			func(in struct {
+				Struct
+
+				A, B int
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				Named("a", 12),
+				Converter(func(v string) (int, error) { return strconv.Atoi(v) }),
+				Converter(func(v int) string { return strconv.Itoa(v) }),
 				FilterInput(func(v Value) bool { return v.Type.Kind() == reflect.String }),
 			},
 			"",

@@ -161,7 +161,7 @@ func Logger(l hclog.Logger) Arg {
 	}
 }
 
-func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
+func (b *argBuilder) graph(log hclog.Logger, g *graph.Graph, root graph.Vertex) []graph.Vertex {
 	var result []graph.Vertex
 
 	// Add our named inputs
@@ -172,6 +172,7 @@ func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
 			Type:  v.Type(),
 			Value: v,
 		})
+		log.Trace("input", "kind", "named", "name", k, "type", v.Type(), "value", v)
 
 		// Input depends on the input root
 		g.AddEdge(input, root)
@@ -190,6 +191,7 @@ func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
 				Subtype: st,
 				Value:   v,
 			})
+			log.Trace("input", "kind", "named", "name", k, "value", v, "subtype", st)
 
 			// Input depends on the input root
 			g.AddEdge(input, root)
@@ -206,6 +208,7 @@ func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
 			Type:  t,
 			Value: v,
 		})
+		log.Trace("input", "kind", "typed", "type", t, "value", v)
 
 		// Input depends on the input root
 		g.AddEdge(input, root)
@@ -223,6 +226,7 @@ func (b *argBuilder) graph(g *graph.Graph, root graph.Vertex) []graph.Vertex {
 				Value:   v,
 				Subtype: st,
 			})
+			log.Trace("input", "kind", "typed", "type", t, "value", v, "subtype", st)
 
 			// Input depends on the input root
 			g.AddEdge(input, root)

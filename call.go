@@ -31,7 +31,7 @@ func (f *Func) callGraph(args *argBuilder) (
 
 	// Next, we add "inputs", which are the given named values that
 	// we already know about. These are tracked as "vertexI".
-	vertexI = args.graph(&g, vertexRoot)
+	vertexI = args.graph(log, &g, vertexRoot)
 
 	// Next, for all values we may have or produce, we need to create
 	// the vertices for the type-only value. This lets us say, for example,
@@ -165,6 +165,7 @@ func (f *Func) callGraph(args *argBuilder) (
 			// says it is possible, then we take the value.
 			include := true
 			if args.filterInput != nil && !args.filterInput(value) {
+				log.Trace("excluding input due to failed filter", "value", value)
 				include = false
 				continue
 			}
@@ -216,13 +217,19 @@ func (f *Func) callGraph(args *argBuilder) (
 	// graph here because we typically have out edges pointing to
 	// requirements, but we're going from requirements (inputs) to
 	// the function.
-	visited := map[interface{}]struct{}{graph.VertexID(vertexF): struct{}{}}
+	visited := map[interface{}]struct{}{
+		// We must keep the root. Since we're starting from the root we don't
+		// "visit" it. But we must keep it for shortest path calculations. If
+		// we don't keep it, our shortest path calculations are from some
+		// other zero index topo sort value.
+		graph.VertexID(vertexRoot): struct{}{},
+	}
 	g.Reverse().DFS(vertexRoot, func(v graph.Vertex, next func() error) error {
+		visited[graph.VertexID(v)] = struct{}{}
+
 		if v == vertexF {
 			return nil
 		}
-
-		visited[graph.VertexID(v)] = struct{}{}
 		return next()
 	})
 
@@ -269,6 +276,7 @@ func (f *Func) Call(opts ...Arg) Result {
 		return resultError(buildErr)
 	}
 	log := builder.logger
+	log.Trace("call")
 
 	// Build our call graph
 	g, _, vertexF, _, err := f.callGraph(builder)
@@ -303,6 +311,8 @@ func (f *Func) reachTarget(
 	state *callState,
 	redefine bool,
 ) error {
+	log.Trace("reachTarget", "target", target)
+
 	// Look at the out edges, since these are the requirements for the conv
 	// and determine which inputs we need values for. If we have a value
 	// already then we skip the target because we assume it is already in
@@ -360,14 +370,21 @@ func (f *Func) reachTarget(
 		paths[i] = currentG.EdgeToPath(current, edgeTo)
 		log.Trace("path for target", "target", current, "path", paths[i])
 
+		// Get the input
+		input := paths[i][0]
+		if _, ok := input.(*rootVertex); ok && len(paths[i]) > 1 {
+			input = paths[i][1]
+		}
+
 		// Store our input used
-		state.InputSet[graph.VertexID(paths[i][0])] = paths[i][0]
+		state.InputSet[graph.VertexID(input)] = input
 
 		// When we're redefining, we always set the initial input to
 		// the zero value because we assume we'll have access to it. We
 		// can assume this because that is the whole definition of redefining.
 		if redefine {
-			switch v := paths[i][0].(type) {
+			// We use index 1 here because our path should always start with root
+			switch v := input.(type) {
 			case *valueVertex:
 				if !v.Value.IsValid() {
 					v.Value = reflect.Zero(v.Type)
