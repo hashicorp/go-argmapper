@@ -117,6 +117,21 @@ func Converter(fs ...interface{}) Arg {
 	}
 }
 
+// ConverterFunc is the same as Converter but takes an already created
+// Func value. Any nil arguments are ignored. This appends to the list of
+// converters.
+func ConverterFunc(fs ...*Func) Arg {
+	return func(a *argBuilder) error {
+		for _, f := range fs {
+			if f != nil {
+				a.convs = append(a.convs, f)
+			}
+		}
+
+		return nil
+	}
+}
+
 // FilterInput is used by Func.Redefine to define what inputs are valid.
 // This will replace any previously set FilterInput value. This has no effect
 // unless Func.Redefine is being called.
@@ -133,6 +148,15 @@ func FilterInput(f FilterFunc) Arg {
 func FilterOutput(f FilterFunc) Arg {
 	return func(a *argBuilder) error {
 		a.filterOutput = f
+		return nil
+	}
+}
+
+// Logger specifies a logger to be used during operations with these
+// arguments. If this isn't specified, the default hclog.L() logger is used.
+func Logger(l hclog.Logger) Arg {
+	return func(a *argBuilder) error {
+		a.logger = l
 		return nil
 	}
 }
