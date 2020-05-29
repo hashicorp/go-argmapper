@@ -430,10 +430,10 @@ func newValueFromVertex(v graph.Vertex) *Value {
 func (v *Value) Arg() Arg {
 	switch v.Kind() {
 	case ValueNamed:
-		return NamedSubtype(v.Name, v.Value, v.Subtype)
+		return NamedSubtype(v.Name, v.Value.Interface(), v.Subtype)
 
 	case ValueTyped:
-		return TypedSubtype(v.Value, v.Subtype)
+		return TypedSubtype(v.Value.Interface(), v.Subtype)
 
 	default:
 		panic("unknown kind: " + v.Kind().String())
