@@ -1,6 +1,7 @@
 package argmapper
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -75,6 +76,16 @@ func TestFuncCall(t *testing.T) {
 			[]interface{}{
 				42,
 			},
+			"",
+		},
+
+		{
+			"basic matching with context",
+			func(ctx context.Context) error { return ctx.Err() },
+			[]Arg{
+				Typed(context.Background()),
+			},
+			[]interface{}{},
 			"",
 		},
 
