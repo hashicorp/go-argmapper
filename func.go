@@ -42,12 +42,20 @@ import (
 // to the user. In all cases, the errors are made available in the Result type
 // for logging.
 type Func struct {
-	fn     reflect.Value
-	input  *ValueSet
-	output *ValueSet
+	fn       reflect.Value
+	input    *ValueSet
+	output   *ValueSet
+	callOpts []Arg
 }
 
-func NewFunc(f interface{}) (*Func, error) {
+// NewFunc creates a new Func from the given input function f.
+//
+// For more details on the format of the function f, see the package docs.
+//
+// Additional opts can be provided. These will always be set when calling
+// Call. Any conflicting arguments given on Call will override these args.
+// This can be used to provide some initial values, converters, etc.
+func NewFunc(f interface{}, opts ...Arg) (*Func, error) {
 	fv := reflect.ValueOf(f)
 	ft := fv.Type()
 	if k := ft.Kind(); k != reflect.Func {
@@ -72,9 +80,10 @@ func NewFunc(f interface{}) (*Func, error) {
 	}
 
 	return &Func{
-		fn:     fv,
-		input:  inTyp,
-		output: outTyp,
+		fn:       fv,
+		input:    inTyp,
+		output:   outTyp,
+		callOpts: opts,
 	}, nil
 }
 
@@ -82,7 +91,7 @@ func NewFunc(f interface{}) (*Func, error) {
 // value sets. When called, this will call the cb with a valueset matching
 // input and output with the argument values set. The cb should return
 // a populated ValueSet.
-func BuildFunc(input, output *ValueSet, cb func(in, out *ValueSet) error) (*Func, error) {
+func BuildFunc(input, output *ValueSet, cb func(in, out *ValueSet) error, opts ...Arg) (*Func, error) {
 	// Make our function type.
 	funcType := reflect.FuncOf(
 		input.Signature(),
@@ -103,7 +112,7 @@ func BuildFunc(input, output *ValueSet, cb func(in, out *ValueSet) error) (*Func
 		}
 
 		return append(output.SignatureValues(), reflect.Zero(errType))
-	}).Interface())
+	}).Interface(), opts...)
 }
 
 // Input returns the input ValueSet for this function, representing the values
@@ -117,6 +126,19 @@ func (f *Func) Output() *ValueSet { return f.output }
 // Func returns the function pointer that this Func is built around.
 func (f *Func) Func() interface{} {
 	return f.fn.Interface()
+}
+
+// argBuilder returns the instantiated argBuilder based on the opts provided
+// as well as the default opts attached to the func.
+func (f *Func) argBuilder(opts ...Arg) (*argBuilder, error) {
+	if len(f.callOpts) > 0 {
+		optsCopy := make([]Arg, len(opts)+len(f.callOpts))
+		copy(optsCopy, f.callOpts)
+		copy(optsCopy[len(f.callOpts):], opts)
+		opts = optsCopy
+	}
+
+	return newArgBuilder(opts...)
 }
 
 // graph adds this function to the graph. The given root should be a single

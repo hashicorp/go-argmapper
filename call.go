@@ -326,7 +326,7 @@ func (f *Func) callGraph(args *argBuilder) (
 // for the function call.
 func (f *Func) Call(opts ...Arg) Result {
 	// Build up our args
-	builder, buildErr := newArgBuilder(opts...)
+	builder, buildErr := f.argBuilder(opts...)
 	if buildErr != nil {
 		return resultError(buildErr)
 	}

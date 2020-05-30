@@ -103,7 +103,7 @@ func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 // (as reflect.Type) that represents the new input structure for the
 // redefined function.
 func (f *Func) redefineInputs(opts ...Arg) (reflect.Type, error) {
-	builder, err := newArgBuilder(opts...)
+	builder, err := f.argBuilder(opts...)
 	if err != nil {
 		return nil, err
 	}

@@ -908,3 +908,14 @@ func TestBuildFunc(t *testing.T) {
 	require.NoError(output.FromResult(f.Call(Named("a", 12))))
 	require.Equal(24, output.Typed(intType).Value.Interface())
 }
+
+func TestFunc_defaultOpts(t *testing.T) {
+	f, err := NewFunc(func(v int) string {
+		return strconv.Itoa(v)
+	}, Named("a", 42))
+	require.NoError(t, err)
+
+	result := f.Call(Typed("foo"))
+	require.NoError(t, result.Err())
+	require.Equal(t, "42", result.Out(0))
+}
