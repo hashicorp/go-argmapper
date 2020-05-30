@@ -470,6 +470,26 @@ func (v *Value) valueOrZero() reflect.Value {
 	return v.Value
 }
 
+func (v *Value) vertex() graph.Vertex {
+	switch v.Kind() {
+	case ValueNamed:
+		return &valueVertex{
+			Name:    v.Name,
+			Type:    v.Type,
+			Subtype: v.Subtype,
+		}
+
+	case ValueTyped:
+		return &typedArgVertex{
+			Type:    v.Type,
+			Subtype: v.Subtype,
+		}
+
+	default:
+		panic(fmt.Sprintf("unknown value kind: %s", v.Kind()))
+	}
+}
+
 type structValue struct {
 	typ   *ValueSet
 	value reflect.Value

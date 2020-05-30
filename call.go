@@ -280,11 +280,12 @@ func (f *Func) Call(opts ...Arg) Result {
 	// function. This will recursively reach various conversion targets
 	// as necessary.
 	state := newCallState()
-	if err := f.reachTarget(log, &g, vertexRoot, vertexF, state, false); err != nil {
+	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, state, false)
+	if err != nil {
 		return resultError(err)
 	}
 
-	return f.callDirect(log, state)
+	return f.callDirect(log, argMap)
 }
 
 // reachTarget executes the the given funcVertex by ensuring we satisfy
@@ -296,8 +297,11 @@ func (f *Func) reachTarget(
 	target graph.Vertex,
 	state *callState,
 	redefine bool,
-) error {
+) (map[interface{}]reflect.Value, error) {
 	log.Trace("reachTarget", "target", target)
+
+	// argMap will store all the values that this target depends on.
+	argMap := map[interface{}]reflect.Value{}
 
 	// Look at the out edges, since these are the requirements for the conv
 	// and determine which inputs we need values for. If we have a value
@@ -307,8 +311,16 @@ func (f *Func) reachTarget(
 	for _, out := range g.OutEdges(target) {
 		skip := false
 		switch v := out.(type) {
+		case *rootVertex:
+			// If we see a root vertex, then that means that this target
+			// has no dependencies.
+			skip = true
+
 		case *typedArgVertex:
-			skip = v.Value.IsValid()
+			if v.Value.IsValid() {
+				skip = true
+				argMap[graph.VertexID(out)] = v.Value
+			}
 		}
 
 		// If we're skipping because we have this value already, then
@@ -324,7 +336,7 @@ func (f *Func) reachTarget(
 
 	if len(vertexT) == 0 {
 		log.Trace("conv satisfied")
-		return nil
+		return argMap, nil
 	}
 
 	paths := make([][]graph.Vertex, len(vertexT))
@@ -379,20 +391,14 @@ func (f *Func) reachTarget(
 	}
 
 	// Go through each path
-	remaining := len(paths)
-	idx := 0
-	for remaining > 0 {
-		path := paths[idx]
-		if len(path) == 0 {
-			idx++
-			continue
-		}
+	for _, path := range paths {
+		// finalValue will be set to our final value that we see when walking.
+		// This will be set as the value for this required input.
+		var finalValue reflect.Value
 
-		pathIdx := 0
-		for pathIdx = 0; pathIdx < len(path); pathIdx++ {
-			log.Trace("executing node", "current", path[pathIdx])
-
-			switch v := path[pathIdx].(type) {
+		for pathIdx, vertex := range path {
+			log.Trace("executing node", "current", vertex)
+			switch v := vertex.(type) {
 			case *rootVertex:
 				// Do nothing
 
@@ -411,6 +417,8 @@ func (f *Func) reachTarget(
 				// If we have a valid value set, then put it on our named list.
 				if v.Value.IsValid() {
 					state.NamedValue[v.Name] = v.Value
+
+					finalValue = v.Value
 				}
 
 			case *typedArgVertex:
@@ -426,6 +434,8 @@ func (f *Func) reachTarget(
 				// Setup our mapping so that we know that this wildcard
 				// maps to this name.
 				state.TypedValue[v.Type] = v.Value
+
+				finalValue = v.Value
 
 			case *typedOutputVertex:
 				// If our last node was another typed output, then we take
@@ -446,21 +456,22 @@ func (f *Func) reachTarget(
 
 			case *funcVertex:
 				// Reach our arguments if they aren't already.
-				if err := f.reachTarget(
+				funcArgMap, err := f.reachTarget(
 					log, //log.Named(graph.VertexName(v)),
 					g,
 					root,
 					v,
 					state,
 					redefine,
-				); err != nil {
-					return err
+				)
+				if err != nil {
+					return nil, err
 				}
 
 				// Call our function.
-				result := v.Func.callDirect(log, state)
+				result := v.Func.callDirect(log, funcArgMap)
 				if err := result.Err(); err != nil {
-					return err
+					return nil, err
 				}
 
 				// Update our graph nodes and continue
@@ -471,50 +482,41 @@ func (f *Func) reachTarget(
 			}
 		}
 
-		paths[idx] = path[pathIdx:]
-		if len(paths[idx]) == 0 {
-			remaining--
+		// We should always have a final value, because our execution to
+		// this point only leads up to this value.
+		if !finalValue.IsValid() {
+			panic(fmt.Sprintf("didn't reach a final value for path: %#v", path))
 		}
-		idx++
+
+		// We store the final value in the input map.
+		log.Trace("final value", "vertex", path[len(path)-1], "value", finalValue.Interface())
+		argMap[graph.VertexID(path[len(path)-1])] = finalValue
+	}
+
+	for k, v := range argMap {
+		println(fmt.Sprintf("ARG MAP %#v %v", k, v))
 	}
 
 	// Reached our goal
-	return nil
+	return argMap, nil
 }
 
 // call -- the unexported version of Call -- calls the function directly
 // with the given named arguments. This skips the whole graph creation
 // step by requiring args satisfy all required arguments.
-func (f *Func) callDirect(log hclog.Logger, state *callState) Result {
+func (f *Func) callDirect(log hclog.Logger, argMap map[interface{}]reflect.Value) Result {
 	// Initialize the struct we'll be populating
 	var buildErr error
 	structVal := f.input.newStructValue()
 	for _, val := range f.input.values {
-		switch val.Kind() {
-		case ValueNamed:
-			v, ok := state.NamedValue[val.Name]
-			if !ok {
-				buildErr = multierror.Append(buildErr, fmt.Errorf(
-					"argument cannot be satisfied: %s", val.Name))
-				continue
-			}
-
-			structVal.Field(val.index).Set(v)
-
-		case ValueTyped:
-			v, ok := state.TypedValue[val.Type]
-			if !ok {
-				buildErr = multierror.Append(buildErr, fmt.Errorf(
-					"typed argument cannot be satisfied at index %d (type %s)",
-					val.index, val.Type.String()))
-				continue
-			}
-
-			structVal.Field(val.index).Set(v)
-
-		default:
-			panic(fmt.Sprintf("unknown value type: %#v", val))
+		arg, ok := argMap[graph.VertexID(val.vertex())]
+		if !ok {
+			buildErr = multierror.Append(buildErr, fmt.Errorf(
+				"argument cannot be satisfied: %s", val.String()))
+			continue
 		}
+
+		structVal.Field(val.index).Set(arg)
 	}
 
 	// If there was an error setting up the struct, then report that.

@@ -349,6 +349,26 @@ func TestFuncCall(t *testing.T) {
 		},
 
 		{
+			"chained multiple input converter",
+			func(in struct {
+				Struct
+
+				A int
+				B string
+			}) string {
+				return in.B + " " + strconv.Itoa(in.A)
+			},
+			[]Arg{
+				Typed(int8(42)),
+				Typed(int16(1)),
+				Converter(func(v int8) int { return int(v) }),
+				Converter(func(v int, n int16) string { return "hello" }),
+			},
+			[]interface{}{"hello 42"},
+			"",
+		},
+
+		{
 			"no argument converter",
 			func(in struct {
 				Struct
@@ -826,6 +846,60 @@ func TestFuncCall(t *testing.T) {
 			},
 			[]interface{}{
 				42,
+			},
+			"",
+		},
+
+		{
+			"subtype type conversion generated multiple paths",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly,subtype=foo"`
+				B int `argmapper:",typeOnly,subtype=bar"`
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				TypedSubtype("foo", "12"),
+				TypedSubtype("bar", "24"),
+				ConverterGen(func(v Value) (*Func, error) {
+					// We only want strings
+					if v.Type != reflect.TypeOf("") {
+						return nil, nil
+					}
+
+					// Convert subtype cause we're going to use it
+					subtypeInt, err := strconv.Atoi(v.Subtype)
+					if err != nil {
+						return nil, err
+					}
+
+					// We take this value as our input.
+					inputSet, err := NewValueSet([]Value{v})
+					if err != nil {
+						return nil, err
+					}
+
+					// Generate an int with the subtype of the string value
+					outputSet, err := NewValueSet([]Value{Value{
+						Name:    v.Name,
+						Type:    reflect.TypeOf(int(0)),
+						Subtype: v.Value.Interface().(string),
+					}})
+					if err != nil {
+						return nil, err
+					}
+
+					return BuildFunc(inputSet, outputSet, func(in, out *ValueSet) error {
+						outputSet.Typed(reflect.TypeOf(int(0))).Value =
+							reflect.ValueOf(subtypeInt)
+						return nil
+					})
+				}),
+			},
+			[]interface{}{
+				36,
 			},
 			"",
 		},
