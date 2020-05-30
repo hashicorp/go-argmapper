@@ -116,7 +116,7 @@ func (f *Func) redefineInputs(opts ...Arg) (reflect.Type, error) {
 	log := builder.logger
 
 	// Get our call graph
-	g, _, vertexF, vertexI, err := f.callGraph(builder)
+	g, vertexRoot, vertexF, vertexI, err := f.callGraph(builder)
 	if err != nil {
 		return nil, err
 	}
@@ -138,17 +138,11 @@ func (f *Func) redefineInputs(opts ...Arg) (reflect.Type, error) {
 		}
 	}
 
-	// Get the topological sort. We only need this so that we can start
-	// calculating shortest path. We'll use shortest path information to
-	// determine the ideal path from our inputs to the function.
-	topo := g.Reverse().KahnSort()
-	log.Trace("topological sort", "sort", topo)
-
 	// Build our call state and attempt to reach our target which is our
 	// function. This will recursively reach various conversion targets
 	// as necessary.
 	state := newCallState()
-	if err := f.reachTarget(log, &g, topo, vertexF, state, true); err != nil {
+	if err := f.reachTarget(log, &g, vertexRoot, vertexF, state, true); err != nil {
 		return nil, err
 	}
 

@@ -240,29 +240,6 @@ func (f *Func) callGraph(args *argBuilder) (
 		}
 	}
 
-	// Do a shortest path search from our function to each of our
-	// root dependents (typically inputs). We discard any functions that
-	// we don't touch. This assists in removing cycles for converters we'll
-	// never call. See the "unnecessary converters" test case.
-	_, edgeTo := g.Dijkstra(vertexF)
-	visited := map[interface{}]struct{}{}
-	for _, v := range g.InEdges(vertexRoot) {
-		for _, v := range g.EdgeToPath(v, edgeTo) {
-			if _, ok := v.(*funcVertex); ok {
-				visited[graph.VertexID(v)] = struct{}{}
-			}
-		}
-	}
-	for _, v := range g.Vertices() {
-		if _, ok := v.(*funcVertex); !ok {
-			continue
-		}
-		if _, ok := visited[graph.VertexID(v)]; !ok {
-			g.Remove(v)
-		}
-	}
-	log.Trace("graph after unused function prune", "graph", g.String())
-
 	// Next we do a DFS from each input A in I to the function F.
 	// This gives us the full set of reachable nodes from our inputs
 	// and at most to F. Using this information, we can prune any nodes
@@ -272,7 +249,7 @@ func (f *Func) callGraph(args *argBuilder) (
 	// graph here because we typically have out edges pointing to
 	// requirements, but we're going from requirements (inputs) to
 	// the function.
-	visited = map[interface{}]struct{}{
+	visited := map[interface{}]struct{}{
 		// We must keep the root. Since we're starting from the root we don't
 		// "visit" it. But we must keep it for shortest path calculations. If
 		// we don't keep it, our shortest path calculations are from some
@@ -334,22 +311,16 @@ func (f *Func) Call(opts ...Arg) Result {
 	log.Trace("call")
 
 	// Build our call graph
-	g, _, vertexF, _, err := f.callGraph(builder)
+	g, vertexRoot, vertexF, _, err := f.callGraph(builder)
 	if err != nil {
 		return resultError(err)
 	}
-
-	// Get the topological sort. We only need this so that we can start
-	// calculating shortest path. We'll use shortest path information to
-	// determine the ideal path from our inputs to the function.
-	topo := g.Reverse().KahnSort()
-	log.Trace("topological sort", "sort", topo)
 
 	// Build our call state and attempt to reach our target which is our
 	// function. This will recursively reach various conversion targets
 	// as necessary.
 	state := newCallState()
-	if err := f.reachTarget(log, &g, topo, vertexF, state, false); err != nil {
+	if err := f.reachTarget(log, &g, vertexRoot, vertexF, state, false); err != nil {
 		return resultError(err)
 	}
 
@@ -361,7 +332,7 @@ func (f *Func) Call(opts ...Arg) Result {
 func (f *Func) reachTarget(
 	log hclog.Logger,
 	g *graph.Graph,
-	topo graph.TopoOrder,
+	root graph.Vertex,
 	target graph.Vertex,
 	state *callState,
 	redefine bool,
@@ -414,12 +385,9 @@ func (f *Func) reachTarget(
 			}
 		}
 
-		// Get the shortest path data. We need to reverse the graph here since
-		// the topo sort is from the reversal as well. We have to calculate
-		// the shortest path for each vertexT value because we may change
-		// edge weights above. We can reuse the topo value because the shape
-		// of the graph is not changing.
-		_, edgeTo := currentG.Reverse().TopoShortestPath(topo.Until(current))
+		// Recalculate the shortest path information since we may changed
+		// the graph above.
+		_, edgeTo := currentG.Reverse().Dijkstra(root)
 
 		// With the latest shortest paths, let's add the path for this target.
 		paths[i] = currentG.EdgeToPath(current, edgeTo)
@@ -523,7 +491,7 @@ func (f *Func) reachTarget(
 				if err := f.reachTarget(
 					log.Named(graph.VertexName(v)),
 					g,
-					topo,
+					root,
 					v,
 					state,
 					false,
