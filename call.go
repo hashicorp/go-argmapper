@@ -212,34 +212,6 @@ func (f *Func) callGraph(args *argBuilder) (
 		}
 	}
 
-	// TODO: explain why
-	for _, raw := range g.Vertices() {
-		v, ok := raw.(*typedArgVertex)
-		if !ok {
-			continue
-		}
-
-		keep := map[interface{}]struct{}{}
-		for _, out := range g.OutEdges(v) {
-			if v, ok := out.(*valueVertex); ok && v.Value.IsValid() {
-				keep[graph.VertexID(out)] = struct{}{}
-				break
-			}
-		}
-
-		if len(keep) > 0 {
-			for _, v := range vertexI {
-				keep[graph.VertexID(v)] = struct{}{}
-			}
-
-			for _, out := range g.OutEdges(v) {
-				if _, ok := keep[graph.VertexID(out)]; !ok {
-					g.RemoveEdge(v, out)
-				}
-			}
-		}
-	}
-
 	// Next we do a DFS from each input A in I to the function F.
 	// This gives us the full set of reachable nodes from our inputs
 	// and at most to F. Using this information, we can prune any nodes
