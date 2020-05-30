@@ -3,6 +3,7 @@ package argmapper
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 
 	"github.com/mitchellh/go-argmapper/internal/graph"
 )
@@ -126,6 +127,21 @@ func (f *Func) Output() *ValueSet { return f.output }
 // Func returns the function pointer that this Func is built around.
 func (f *Func) Func() interface{} {
 	return f.fn.Interface()
+}
+
+// String returns the name for this function. This will attempt to find
+// the name of the function from the function pointer. If a name can't be
+// found, the type signature is used.
+func (f *Func) String() string {
+	// Try to get a name for the function
+	name := f.fn.String()
+	if name == "" {
+		if rfunc := runtime.FuncForPC(f.fn.Pointer()); rfunc != nil {
+			name = rfunc.Name()
+		}
+	}
+
+	return name
 }
 
 // argBuilder returns the instantiated argBuilder based on the opts provided
