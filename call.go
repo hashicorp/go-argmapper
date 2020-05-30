@@ -366,7 +366,6 @@ func (f *Func) reachTarget(
 		// the zero value because we assume we'll have access to it. We
 		// can assume this because that is the whole definition of redefining.
 		if redefine {
-			// We use index 1 here because our path should always start with root
 			switch v := input.(type) {
 			case *valueVertex:
 				if !v.Value.IsValid() {
@@ -391,8 +390,7 @@ func (f *Func) reachTarget(
 
 		pathIdx := 0
 		for pathIdx = 0; pathIdx < len(path); pathIdx++ {
-			log := log.With("current", path[pathIdx])
-			log.Trace("executing node")
+			log.Trace("executing node", "current", path[pathIdx])
 
 			switch v := path[pathIdx].(type) {
 			case *rootVertex:
@@ -449,12 +447,12 @@ func (f *Func) reachTarget(
 			case *funcVertex:
 				// Reach our arguments if they aren't already.
 				if err := f.reachTarget(
-					log.Named(graph.VertexName(v)),
+					log, //log.Named(graph.VertexName(v)),
 					g,
 					root,
 					v,
 					state,
-					false,
+					redefine,
 				); err != nil {
 					return err
 				}
