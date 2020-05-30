@@ -415,6 +415,28 @@ func TestFuncCall(t *testing.T) {
 			"",
 		},
 
+		{
+			"duplicate type converters",
+			func(in struct {
+				Struct
+
+				A string
+				B int
+			}) string {
+				return strings.Repeat(in.A, in.B)
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 2),
+				Converter(func(in int) string { return strconv.Itoa(in) }),
+				Converter(func(in int) string { return strconv.Itoa(in) }),
+				Converter(func(in int) string { return strconv.Itoa(in) }),
+				Converter(func(in int) string { return strconv.Itoa(in) }),
+			},
+			[]interface{}{"1212"},
+			"",
+		},
+
 		//-----------------------------------------------------------
 		// TYPE CONVERTER STRUCTS
 
