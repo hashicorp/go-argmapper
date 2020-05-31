@@ -493,10 +493,6 @@ func (f *Func) reachTarget(
 		argMap[graph.VertexID(path[len(path)-1])] = finalValue
 	}
 
-	for k, v := range argMap {
-		println(fmt.Sprintf("ARG MAP %#v %v", k, v))
-	}
-
 	// Reached our goal
 	return argMap, nil
 }
