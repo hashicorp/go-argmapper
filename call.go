@@ -9,6 +9,35 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
+// Call calls the function. Use the various Arg functions to set the state
+// for the function call. More details on how Call works are on the Func
+// struct documentation directly.
+func (f *Func) Call(opts ...Arg) Result {
+	// Build up our args
+	builder, buildErr := f.argBuilder(opts...)
+	if buildErr != nil {
+		return resultError(buildErr)
+	}
+	log := builder.logger
+	log.Trace("call")
+
+	// Build our call graph
+	g, vertexRoot, vertexF, _, err := f.callGraph(builder)
+	if err != nil {
+		return resultError(err)
+	}
+
+	// Reach our target function to get our arguments, performing any
+	// conversions necessary.
+	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, newCallState(), false)
+	if err != nil {
+		return resultError(err)
+	}
+
+	return f.callDirect(log, argMap)
+}
+
+// callGraph builds the common graph used by Call, Redefine, etc.
 func (f *Func) callGraph(args *argBuilder) (
 	g graph.Graph,
 	vertexRoot graph.Vertex,
@@ -257,35 +286,6 @@ func (f *Func) callGraph(args *argBuilder) (
 	}
 
 	return
-}
-
-// Call calls the function. Use the various Arg functions to set the state
-// for the function call.
-func (f *Func) Call(opts ...Arg) Result {
-	// Build up our args
-	builder, buildErr := f.argBuilder(opts...)
-	if buildErr != nil {
-		return resultError(buildErr)
-	}
-	log := builder.logger
-	log.Trace("call")
-
-	// Build our call graph
-	g, vertexRoot, vertexF, _, err := f.callGraph(builder)
-	if err != nil {
-		return resultError(err)
-	}
-
-	// Build our call state and attempt to reach our target which is our
-	// function. This will recursively reach various conversion targets
-	// as necessary.
-	state := newCallState()
-	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, state, false)
-	if err != nil {
-		return resultError(err)
-	}
-
-	return f.callDirect(log, argMap)
 }
 
 // reachTarget executes the the given funcVertex by ensuring we satisfy

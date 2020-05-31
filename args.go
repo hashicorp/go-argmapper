@@ -88,6 +88,7 @@ func Typed(vs ...interface{}) Arg {
 }
 
 // TypedSubtype is the same as Typed but specifies a subtype key for the value.
+// If the subtype is empty, this is equivalent to calling Typed.
 func TypedSubtype(v interface{}, st string) Arg {
 	if st == "" {
 		return Typed(v)

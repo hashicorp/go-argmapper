@@ -12,36 +12,60 @@ import (
 // a function that can be used to provide values, convert types, etc. for
 // calling another Func.
 //
+// A Func can take any number of arguments and return any number of values.
+// Direct function arguments are matched via type. You may use a struct
+// that embeds the Struct type (see Struct) for named value matching.
+// Go reflection doesn't enable accessing direct function parameter names,
+// so a struct is required for named matching.
+//
+// Structs that do not embed the Struct type are matched as typed.
+//
+// Converter Basics
+//
+// A Func also can act as a converter for another function call when used
+// with the Converter Arg option.
+//
 // Converters are used if a direct match argument isn't found for a Func call.
 // If a converter exists (or a chain of converts) to go from the input arguments
 // to the desired argument, then the chain will be called and the result used.
 //
-// Converter Basics
+// Like any typical Func, converters can take as input zero or more values of
+// any kind. Converters can return any number of values as a result. Note that
+// while no return values are acceptable, such a converter would never be
+// called since it provides no value to the target function call.
 //
-// Converters must take a struct as input and return a struct as output. The
-// input struct is identical to a Func and arguments are mapped directly to it.
+// Converters can output both typed and named values. Similar to inputs,
+// outputting a name value requires using a struct with the Struct type
+// embedded.
 //
-// The output struct is similar to the input struct, except that the keys and
-// tags of the output struct will set new values for that input type. These
-// values are only set for that specific chain execution. For example:
+// Converter Errors
 //
-//    TODO
+// A final return type of "error" can be used with converters to signal
+// that conversion failed. If this occurs, the full function call attempt
+// fails and the error is reported to the user.
 //
-// Attempted Conversions
+// Converter Priorities
 //
-// The output type can also be a pointer to a struct. If a nil pointer is
-// returned, the conversion is assumed to have failed. In this case, an
-// alternate chain (if it exists) will be tried.
+// When multiple converters are available to reach some desired type,
+// Func will determine which converter to call using an implicit "cost"
+// associated with the converter. The cost is calculated across multiple
+// dimensions:
 //
-//    TODO
+//   * When converting from one named value to another, such as "Input int"
+//     to "Input string", conversion will favor any converters that explicitly
+//     use the equivalent name (but different type). So if there are two
+//     converters, one `func(int) string` and another `func(Input int) string`,
+//     then the latter will be preferred.
 //
-// Errors
+//   * Building on the above, if there is only one converter `func(int) string`
+//     but there are multiple `int` inputs available, an input with a matching
+//     name is preferred. Therefore, if an input named `Input` is available,
+//     that will be used for the conversion.
 //
-// A second output type of error can be used to specify any errors that
-// occurred during conversion. If a non-nil error is returned, alternate
-// chains will be attempted. If all chains fail, the error will be reported
-// to the user. In all cases, the errors are made available in the Result type
-// for logging.
+//   * Converters that have less input values are preferred. This isn't
+//     a direct parameter count on the function, but a count on the input
+//     values which includes struct members and so on.
+//
 type Func struct {
 	fn       reflect.Value
 	input    *ValueSet
