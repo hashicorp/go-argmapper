@@ -76,10 +76,13 @@ func NamedSubtype(n string, v interface{}, st string) Arg {
 // Typed specifies a typed argument with the given value. This will satisfy
 // any requirement where the type is assignable to a required value. The name
 // can be anything of the required value.
-func Typed(v interface{}) Arg {
+func Typed(vs ...interface{}) Arg {
 	return func(a *argBuilder) error {
-		rv := reflect.ValueOf(v)
-		a.typed[rv.Type()] = rv
+		for _, v := range vs {
+			rv := reflect.ValueOf(v)
+			a.typed[rv.Type()] = rv
+		}
+
 		return nil
 	}
 }

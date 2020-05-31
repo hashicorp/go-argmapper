@@ -88,6 +88,21 @@ func NewFunc(f interface{}, opts ...Arg) (*Func, error) {
 	}, nil
 }
 
+// NewFuncList initializes multiple Funcs at once. This is the same as
+// calling NewFunc for each f.
+func NewFuncList(fs []interface{}, opts ...Arg) ([]*Func, error) {
+	result := make([]*Func, len(fs))
+	for i, f := range fs {
+		var err error
+		result[i], err = NewFunc(f)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
 // BuildFunc builds a function based on the specified input and output
 // value sets. When called, this will call the cb with a valueset matching
 // input and output with the argument values set. The cb should return
