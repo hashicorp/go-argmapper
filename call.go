@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/hashicorp/go-argmapper/internal/graph"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-multierror"
-	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
 func (f *Func) callGraph(args *argBuilder) (

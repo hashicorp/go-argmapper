@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/mitchellh/go-argmapper/internal/graph"
+	"github.com/hashicorp/go-argmapper/internal/graph"
 )
 
 //go:generate stringer -type=ValueKind

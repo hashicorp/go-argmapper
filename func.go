@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"runtime"
 
-	"github.com/mitchellh/go-argmapper/internal/graph"
+	"github.com/hashicorp/go-argmapper/internal/graph"
 )
 
 // Func represents both a target function you want to execute as well as

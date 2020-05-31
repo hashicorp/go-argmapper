@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/hashicorp/go-argmapper/internal/graph"
 	"github.com/hashicorp/go-multierror"
-	"github.com/mitchellh/go-argmapper/internal/graph"
 )
 
 // Redefine returns a new func where the requirements are what is missing to

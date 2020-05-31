@@ -1,4 +1,4 @@
-module github.com/mitchellh/go-argmapper
+module github.com/hashicorp/go-argmapper
 
 go 1.14
 

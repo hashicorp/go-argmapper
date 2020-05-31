@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/mitchellh/go-argmapper/internal/graph"
+	"github.com/hashicorp/go-argmapper/internal/graph"
 )
 
 const (
