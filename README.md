@@ -93,6 +93,46 @@ if result.Err() != nil {
 println(result.Out(0).(string))
 ```
 
+Both `A` and `B` are of the same type, but are matched on their names.
+This lets us get the desired value of 42, rather than `21*21`, `2*2`, etc.
+
+Note that `Prefix` is a named parameter, but we don't provide any
+inputs matching that name. In this case, argmapper by default falls back
+to treating it as a typed parameter, allowing our typed string input to
+match.
+
+### Explicitly Typed Values
+
+The previous example showed `Prefix` implicitly using a typed-only
+match since there was no input named "Prefix". You can also explictly
+note that the name doesn't matter in two ways.
+
+First, you can use struct tags:
+
+```go
+target, err := argmapper.NewFunc(func(input struct {
+	// This tells argmapper to fill the values in this struct rather
+	// than provide a value for the entire struct.
+	argmapper.Struct
+
+	A int
+	B int
+	Prefix string `argmapper:",typeOnly"`
+}) string {
+	return fmt.Sprintf("%s: %d", in.Prefix, in.A*in.B)
+})
+```
+
+You can also use a non-struct input. Go reflection doesn't reveal
+function parameter names so all function parameters are by definition
+type only:
+
+```go
+target, err := argmapper.NewFunc(func(string) {})
+```
+
+You can mix and match named and typed parameters.
+
 ### Conversion Function Chaining
 
 The example below shows how conversion functions are automatically
@@ -129,3 +169,48 @@ if result.Err() != nil {
 // Prints "0"
 println(result.Out(0).(string))
 ```
+
+Typed converters preserve the name of their arguments. If the above input
+was `Named("foo", false)` rather than typed, then the name "foo" would
+be attached both the string and int values generated in case any target
+functions requested a named parameter. In the case of this example, the name
+is carried through but carries no consequence since the final target
+function is just a typed parameter.
+
+### Conversion Function Cycles
+
+Cycles in conversion functions are completely allowed. The example
+below behaves as you would expect. This is a simple direct cycle, more complex
+cycles from chaining multiple converters will also behave correctly. This
+lets you register complex sets of bidirectional conversion functions with ease.
+
+```go
+// Trivial function that takes a string and just returns it.
+target, err := argmapper.NewFunc(func(v string) string { return v })
+
+result := target.Call(
+	argmapper.Typed(12),
+	argmapper.Converter(func(v int) string { return strconv.Itoa(v) }),
+	argmapper.Converter(func(v string) (int, error) { return strconv.Atoi(v) }),
+)
+if result.Err() != nil {
+	// If we didn't have converters necessary to get us from bool => int => string
+	// then this would fail.
+	panic(result.Err())
+}
+
+// Prints "12"
+println(result.Out(0).(string))
+```
+
+### Conversion Errors
+
+The example above has a converter that returns `(int, error)`. If the final
+return type of a converter is `error`, go-argmapper treats that as a special
+value signaling if the conversion succeeded or failed.
+
+If conversion fails, the target function call fails and the error is returned
+to the user.
+
+In the future, we plan on retrying via other possible conversion paths
+if they are available.
