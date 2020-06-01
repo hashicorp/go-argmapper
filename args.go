@@ -52,7 +52,13 @@ func newArgBuilder(opts ...Arg) (*argBuilder, error) {
 // Named specifies a named argument with the given value. This will satisfy
 // any requirement where the name matches AND the value is assignable to
 // the struct.
+//
+// If the name is an empty string, this is equivalent to calling Typed.
 func Named(n string, v interface{}) Arg {
+	if n == "" {
+		return Typed(v)
+	}
+
 	return func(a *argBuilder) error {
 		a.named[strings.ToLower(n)] = reflect.ValueOf(v)
 		return nil
@@ -60,7 +66,13 @@ func Named(n string, v interface{}) Arg {
 }
 
 // NamedSubtype is the same as Named but specifies a subtype for the value.
+//
+// If the name is an empty string, this is the equivalent to calling TypedSubtype.
 func NamedSubtype(n string, v interface{}, st string) Arg {
+	if n == "" {
+		return TypedSubtype(v, st)
+	}
+
 	if st == "" {
 		return Named(n, v)
 	}
