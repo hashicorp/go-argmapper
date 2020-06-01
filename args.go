@@ -26,6 +26,8 @@ type argBuilder struct {
 	redefining   bool
 	filterInput  FilterFunc
 	filterOutput FilterFunc
+
+	funcName string
 }
 
 func newArgBuilder(opts ...Arg) (*argBuilder, error) {
@@ -181,6 +183,14 @@ func FilterOutput(f FilterFunc) Arg {
 func Logger(l hclog.Logger) Arg {
 	return func(a *argBuilder) error {
 		a.logger = l
+		return nil
+	}
+}
+
+// FuncName sets the function name. This is used only with NewFunc.
+func FuncName(n string) Arg {
+	return func(a *argBuilder) error {
+		a.funcName = n
 		return nil
 	}
 }

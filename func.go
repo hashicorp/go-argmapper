@@ -71,6 +71,7 @@ type Func struct {
 	input    *ValueSet
 	output   *ValueSet
 	callOpts []Arg
+	name     string
 }
 
 // NewFunc creates a new Func from the given input function f.
@@ -81,6 +82,11 @@ type Func struct {
 // Call. Any conflicting arguments given on Call will override these args.
 // This can be used to provide some initial values, converters, etc.
 func NewFunc(f interface{}, opts ...Arg) (*Func, error) {
+	args, err := newArgBuilder(opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	fv := reflect.ValueOf(f)
 	ft := fv.Type()
 	if k := ft.Kind(); k != reflect.Func {
@@ -109,6 +115,7 @@ func NewFunc(f interface{}, opts ...Arg) (*Func, error) {
 		input:    inTyp,
 		output:   outTyp,
 		callOpts: opts,
+		name:     args.funcName,
 	}, nil
 }
 
@@ -168,19 +175,34 @@ func (f *Func) Func() interface{} {
 	return f.fn.Interface()
 }
 
-// String returns the name for this function. This will attempt to find
-// the name of the function from the function pointer. If a name can't be
-// found, the type signature is used.
-func (f *Func) String() string {
-	// Try to get a name for the function
-	name := f.fn.String()
+// Name returns the name of the function.
+//
+// This will return the configured name if one was given on NewFunc. If not,
+// this will attempt to look up the function name using the pointer. If
+// no friendly name can be found, then this will default to the function
+// type signature.
+func (f *Func) Name() string {
+	// Use our set name first, if we have one
+	name := f.name
+
+	// Fall back to inspecting the program counter
 	if name == "" {
 		if rfunc := runtime.FuncForPC(f.fn.Pointer()); rfunc != nil {
 			name = rfunc.Name()
 		}
+
+		// Final fallback is our type signature
+		if name == "" {
+			name = f.fn.String()
+		}
 	}
 
 	return name
+}
+
+// String returns the name for this function. See Name.
+func (f *Func) String() string {
+	return f.Name()
 }
 
 // argBuilder returns the instantiated argBuilder based on the opts provided
