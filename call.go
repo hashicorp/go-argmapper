@@ -85,6 +85,14 @@ func (f *Func) callGraph(args *argBuilder) (
 		g.AddEdgeWeighted(g.Add(&typedArgVertex{
 			Type: v.Type,
 		}), v, weightTyped)
+
+		// If this value has a subtype, we add an edge for the subtype
+		if v.Subtype != "" {
+			g.AddEdgeWeighted(g.Add(&typedArgVertex{
+				Type:    v.Type,
+				Subtype: v.Subtype,
+			}), v, weightTyped)
+		}
 	}
 
 	// We need to allow any typed argument to depend on a typed output.

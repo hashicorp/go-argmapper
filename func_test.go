@@ -705,6 +705,25 @@ func TestFuncCall(t *testing.T) {
 		},
 
 		{
+			"subtype type match named",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly,subtype=foo"`
+			}) int {
+				return in.A
+			},
+			[]Arg{
+				Named("A", 24),
+				NamedSubtype("A", 24, "foo"),
+			},
+			[]interface{}{
+				24,
+			},
+			"",
+		},
+
+		{
 			"subtype type no match",
 			func(in struct {
 				Struct
