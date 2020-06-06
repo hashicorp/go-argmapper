@@ -275,9 +275,16 @@ func (f *Func) callGraph(args *argBuilder) (
 			switch v := req.(type) {
 			case *valueVertex:
 				name = fmt.Sprintf("%q of type %s", v.Name, v.Type.String())
+				if v.Subtype != "" {
+					name += fmt.Sprintf(" (subtype: %q)", v.Subtype)
+				}
 
 			case *typedArgVertex:
 				name = fmt.Sprintf("type %s", v.Type.String())
+				if v.Subtype != "" {
+					name += fmt.Sprintf(" (subtype: %q)", v.Subtype)
+
+				}
 			}
 
 			err = multierror.Append(err, fmt.Errorf(
