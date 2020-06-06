@@ -73,11 +73,9 @@ func (f *Func) callGraph(args *argBuilder) (
 
 		// We only add an edge from the output if we require a value.
 		// If we already have a value then we don't need to request one.
-		if !v.Value.IsValid() {
-			g.AddEdgeWeighted(v, g.Add(&typedOutputVertex{
-				Type: v.Type,
-			}), weightTyped)
-		}
+		g.AddEdgeWeighted(v, g.Add(&typedOutputVertex{
+			Type: v.Type,
+		}), weightTyped)
 
 		// We always add an edge from the arg to the value, whether it
 		// has one or not. In the next step, we'll prune any typed arguments
