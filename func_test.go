@@ -2,6 +2,7 @@ package argmapper
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -17,6 +18,9 @@ func init() {
 }
 
 func TestFuncCall(t *testing.T) {
+	// Used in some test cases.
+	errSentinel := errors.New("error")
+
 	cases := []struct {
 		Name     string
 		Callback interface{}
@@ -118,6 +122,29 @@ func TestFuncCall(t *testing.T) {
 			[]Arg{Named("a", 12)},
 			[]interface{}{12},
 			"",
+		},
+
+		{
+			"no return values, only errors",
+			func(in struct {
+				Struct
+
+				A, B int
+			}) error {
+				if in.A != 12 || in.B != 24 {
+					// We panic to signal failure here instead of using
+					// t but this should never happen.
+					panic("failure")
+				}
+
+				return errSentinel
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 24),
+			},
+			[]interface{}{},
+			errSentinel.Error(),
 		},
 
 		{

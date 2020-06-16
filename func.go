@@ -44,6 +44,10 @@ import (
 // that conversion failed. If this occurs, the full function call attempt
 // fails and the error is reported to the user.
 //
+// If there is only one return value and it is of type "error", then this
+// is still considered the error result. A function can't return a non-erroneous
+// error value without returning more than one result value.
+//
 // Converter Priorities
 //
 // When multiple converters are available to reach some desired type,
@@ -101,7 +105,7 @@ func NewFunc(f interface{}, opts ...Arg) (*Func, error) {
 	// Get our output parameters. If the last parameter is an error type
 	// then we don't parse that as the struct information.
 	numOut := ft.NumOut()
-	if numOut > 1 && ft.Out(numOut-1) == errType {
+	if numOut >= 1 && ft.Out(numOut-1) == errType {
 		numOut -= 1
 	}
 
