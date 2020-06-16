@@ -171,6 +171,25 @@ func TestFuncRedefine(t *testing.T) {
 		},
 
 		{
+			"satisfy output type with error",
+			func(in struct {
+				Struct
+
+				A, B int
+			}) (int, error) {
+				return in.A + in.B, nil
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 24),
+				FilterOutput(FilterType(reflect.TypeOf(int(0)))),
+			},
+			"",
+			[]Arg{},
+			[]interface{}{36},
+		},
+
+		{
 			"fail to satisfy output type",
 			func(in struct {
 				Struct

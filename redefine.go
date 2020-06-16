@@ -46,9 +46,14 @@ func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 		out[i] = f.fn.Type().Out(i)
 	}
 
+	// hasErr tells us whether out originally had an error output. We need
+	// this to construct the proper return value in the dynamic func below.
+	hasErr := true
+
 	// If we don't have an error type, add that
 	if len(out) == 0 || out[len(out)-1] != errType {
 		out = append(out, errType)
+		hasErr = false
 	}
 
 	// Build our function type and implementation.
@@ -90,9 +95,15 @@ func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 			return retval
 		}
 
-		// Otherwise, return our values! We have to append the zero error
-		// value because our defined function always returns an error value.
-		return append(result.out, reflect.Zero(errType))
+		out := result.out
+		if !hasErr {
+			// If we didn't originally have an error value, then we
+			// append the zero value since we always return an error
+			// as the final result from this dynamic func.
+			out = append(result.out, reflect.Zero(errType))
+		}
+
+		return out
 	})
 
 	return NewFunc(fn.Interface())
