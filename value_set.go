@@ -292,6 +292,12 @@ func (vs *ValueSet) TypedSubtype(t reflect.Type, st string) *Value {
 // this valueset.
 func (vs *ValueSet) Signature() []reflect.Type {
 	if !vs.lifted() {
+		// This happens if the value has no values at all. In this case,
+		// our signature is also empty.
+		if vs.structType == nil {
+			return nil
+		}
+
 		return []reflect.Type{vs.structType}
 	}
 

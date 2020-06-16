@@ -1029,6 +1029,19 @@ func TestBuildFunc(t *testing.T) {
 	require.Equal(24, output.Typed(intType).Value.Interface())
 }
 
+func TestBuildFunc_noOutput(t *testing.T) {
+	require := require.New(t)
+
+	f, err := NewFunc(func(a int) {})
+	require.NoError(err)
+
+	f, err = BuildFunc(f.Input(), f.Output(), func(in, out *ValueSet) error {
+		return nil
+	})
+	require.NoError(err)
+	require.NoError(f.Output().FromResult(f.Call(Named("a", 12))))
+}
+
 func TestFunc_defaultOpts(t *testing.T) {
 	f, err := NewFunc(func(v int) string {
 		return strconv.Itoa(v)
