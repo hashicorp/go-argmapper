@@ -153,8 +153,10 @@ func BuildFunc(input, output *ValueSet, cb func(in, out *ValueSet) error, opts .
 	// Build our function
 	return NewFunc(reflect.MakeFunc(funcType, func(vs []reflect.Value) []reflect.Value {
 		// Set our input
-		input.FromSignature(vs)
-
+		if err := input.FromSignature(vs); err != nil {
+			// FromSignature can not currently return an error
+			panic(err)
+		}
 		// Call
 		if err := cb(input, output); err != nil {
 			return append(output.SignatureValues(), reflect.ValueOf(err))
