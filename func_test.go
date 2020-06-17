@@ -1042,6 +1042,27 @@ func TestBuildFunc_noOutput(t *testing.T) {
 	require.NoError(f.Output().FromResult(f.Call(Named("a", 12))))
 }
 
+func TestBuildFunc_errValue(t *testing.T) {
+	require := require.New(t)
+
+	f, err := NewFunc(func(a int) {})
+	require.NoError(err)
+
+	input, err := NewValueSet([]Value{
+		Value{
+			Name: "a",
+			Type: errType,
+		},
+	})
+	require.NoError(err)
+
+	f, err = BuildFunc(input, f.Output(), func(in, out *ValueSet) error {
+		return nil
+	})
+
+	require.EqualError(f.Output().FromResult(f.Call(Named("a", 12))), "some error")
+}
+
 func TestFunc_defaultOpts(t *testing.T) {
 	f, err := NewFunc(func(v int) string {
 		return strconv.Itoa(v)
