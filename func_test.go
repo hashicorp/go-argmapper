@@ -1045,19 +1045,21 @@ func TestBuildFunc_noOutput(t *testing.T) {
 func TestBuildFunc_errValue(t *testing.T) {
 	require := require.New(t)
 
+	intType := reflect.TypeOf(int(0))
+
 	f, err := NewFunc(func(a int) {})
 	require.NoError(err)
 
 	input, err := NewValueSet([]Value{
 		Value{
 			Name: "a",
-			Type: errType,
+			Type: intType,
 		},
 	})
 	require.NoError(err)
 
 	f, err = BuildFunc(input, f.Output(), func(in, out *ValueSet) error {
-		return nil
+		return fmt.Errorf("some error")
 	})
 
 	require.EqualError(f.Output().FromResult(f.Call(Named("a", 12))), "some error")
