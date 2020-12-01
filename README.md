@@ -4,9 +4,11 @@ go-argmapper is a dependency-injection library for Go that supports
 automatically chaining conversion functions to reach desired results.
 go-argmapper is designed for runtime, reflection-based dependency injection.
 
-**API Status: Unstable.** We're still actively working on the API and
-may change it in backwards incompatible ways. We don't think the API will
-change significantly but it still can. 
+**API Status: Mostly Stable.** We have released HashiCorp products using
+this library successfully, so we don't think the API will change significantly.
+For the time being, we're retaining the 0.x version numbers to note that we
+may still change the API and to recognize that the library has only been
+used in the real world for a short period of time.
 
 ## Features
 
