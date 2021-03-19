@@ -22,8 +22,10 @@ type ValueSet struct {
 	structType reflect.Type
 
 	// structPointers is the number of pointers that wrap structType.
-	// We use this to construct the correct argument type.
-	structPointers uint
+	// We use this to construct the correct argument type. Note we only
+	// support one pointer today, so this will be at most "1" but making it
+	// an int for the future.
+	structPointers uint8
 
 	// values is the set of values that this ValueSet contains. namedValues,
 	// typedValues, etc. are convenience maps for looking up values more
@@ -178,7 +180,7 @@ func newValueSet(count int, get func(int) reflect.Type) (*ValueSet, error) {
 func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 	// Unwrap any pointers around our struct type and count the number of
 	// pointer derefs. We need to know the count to reconstruct it later.
-	var ptrCount uint
+	var ptrCount uint8
 	for typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
 		ptrCount++
@@ -414,7 +416,7 @@ func (t *ValueSet) result(r Result) Result {
 	// any pointers. We know this to be true already since we analyzed the
 	// function earlier.
 	if !t.lifted() {
-		for i := uint(0); i < t.structPointers; i++ {
+		for i := uint8(0); i < t.structPointers; i++ {
 			r.out[0] = r.out[0].Elem()
 		}
 
@@ -543,7 +545,7 @@ func (v *structValue) CallIn() []reflect.Value {
 	if !v.typ.lifted() {
 		// We do need to wrap the value in some pointers
 		val := v.value
-		for i := uint(0); i < v.typ.structPointers; i++ {
+		for i := uint8(0); i < v.typ.structPointers; i++ {
 			val = val.Addr()
 		}
 
