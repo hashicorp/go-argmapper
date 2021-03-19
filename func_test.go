@@ -48,6 +48,25 @@ func TestFuncCall(t *testing.T) {
 		},
 
 		{
+			"basic named matching (pointer struct)",
+			func(in *struct {
+				Struct
+
+				A, B int
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 24),
+			},
+			[]interface{}{
+				36,
+			},
+			"",
+		},
+
+		{
 			"basic matching with types",
 			func(in struct {
 				Struct
@@ -515,6 +534,64 @@ func TestFuncCall(t *testing.T) {
 				}),
 			},
 			[]interface{}{"12!"},
+			"",
+		},
+
+		{
+			"direct named converter (pointer)",
+			func(in struct {
+				Struct
+
+				A string
+			}) string {
+				return in.A + "!"
+			},
+			[]Arg{
+				Named("a", 12),
+				Converter(func(s struct {
+					Struct
+
+					A int
+				}) *struct {
+					Struct
+
+					A string
+				} {
+					return &struct {
+						Struct
+
+						A string
+					}{A: strconv.Itoa(s.A)}
+				}),
+			},
+			[]interface{}{"12!"},
+			"",
+		},
+
+		{
+			"direct named converter (pointer, nil result)",
+			func(in struct {
+				Struct
+
+				A string
+			}) string {
+				return in.A + "!"
+			},
+			[]Arg{
+				Named("a", 12),
+				Converter(func(s struct {
+					Struct
+
+					A int
+				}) *struct {
+					Struct
+
+					A string
+				} {
+					return nil
+				}),
+			},
+			[]interface{}{"!"},
 			"",
 		},
 

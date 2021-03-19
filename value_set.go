@@ -21,6 +21,12 @@ type ValueSet struct {
 	// structType is a struct that contains all the settable values.
 	structType reflect.Type
 
+	// structPointers is the number of pointers that wrap structType.
+	// We use this to construct the correct argument type. Note we only
+	// support one pointer today, so this will be at most "1" but making it
+	// an int for the future.
+	structPointers uint8
+
 	// values is the set of values that this ValueSet contains. namedValues,
 	// typedValues, etc. are convenience maps for looking up values more
 	// easily.
@@ -172,6 +178,17 @@ func newValueSet(count int, get func(int) reflect.Type) (*ValueSet, error) {
 }
 
 func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
+	// Unwrap any pointers around our struct type and count the number of
+	// pointer derefs. We need to know the count to reconstruct it later.
+	var ptrCount uint8
+	for typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+		ptrCount++
+	}
+	if ptrCount > 1 {
+		return nil, fmt.Errorf("struct argument can at most be a single pointer")
+	}
+
 	// Verify our value is a struct
 	if typ.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("struct expected, got %s", typ.Kind())
@@ -179,10 +196,11 @@ func newValueSetFromStruct(typ reflect.Type) (*ValueSet, error) {
 
 	// We will accumulate our results here
 	result := &ValueSet{
-		structType:  typ,
-		values:      []*Value{},
-		namedValues: map[string]*Value{},
-		typedValues: map[reflect.Type]*Value{},
+		structType:     typ,
+		structPointers: ptrCount,
+		values:         []*Value{},
+		namedValues:    map[string]*Value{},
+		typedValues:    map[reflect.Type]*Value{},
 	}
 
 	// Go through the fields and record them all
@@ -394,8 +412,20 @@ func (t *ValueSet) empty() bool {
 // result takes the result that matches this struct type and adapts it
 // if necessary (if the struct type is lifted or so on).
 func (t *ValueSet) result(r Result) Result {
-	// If we aren't lifted, we return the result as-is.
+	// If we aren't lifted, we return the direct struct. We have to unwrap
+	// any pointers. We know this to be true already since we analyzed the
+	// function earlier.
 	if !t.lifted() {
+		for i := uint8(0); i < t.structPointers; i++ {
+			r.out[0] = r.out[0].Elem()
+		}
+
+		// A nil result is equivalent to zero values, allocate the struct.
+		// This happens if there are pointer results and the user returns nil.
+		if !r.out[0].IsValid() {
+			r.out[0] = reflect.New(t.structType).Elem()
+		}
+
 		return r
 	}
 
@@ -513,7 +543,13 @@ func (v *structValue) CallIn() []reflect.Value {
 
 	// If this is not lifted, return it as-is.
 	if !v.typ.lifted() {
-		return []reflect.Value{v.value}
+		// We do need to wrap the value in some pointers
+		val := v.value
+		for i := uint8(0); i < v.typ.structPointers; i++ {
+			val = val.Addr()
+		}
+
+		return []reflect.Value{val}
 	}
 
 	// This is lifted, so we need to unpack them in order.
