@@ -61,6 +61,10 @@ type structInterface interface {
 // isStruct returns true if the given type is a struct that embeds our
 // struct marker.
 func isStruct(t reflect.Type) bool {
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
 	if t.Kind() != reflect.Struct {
 		return false
 	}

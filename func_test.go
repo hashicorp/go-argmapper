@@ -48,6 +48,25 @@ func TestFuncCall(t *testing.T) {
 		},
 
 		{
+			"basic named matching (pointer struct)",
+			func(in *struct {
+				Struct
+
+				A, B int
+			}) int {
+				return in.A + in.B
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 24),
+			},
+			[]interface{}{
+				36,
+			},
+			"",
+		},
+
+		{
 			"basic matching with types",
 			func(in struct {
 				Struct
