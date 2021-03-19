@@ -538,6 +538,64 @@ func TestFuncCall(t *testing.T) {
 		},
 
 		{
+			"direct named converter (pointer)",
+			func(in struct {
+				Struct
+
+				A string
+			}) string {
+				return in.A + "!"
+			},
+			[]Arg{
+				Named("a", 12),
+				Converter(func(s struct {
+					Struct
+
+					A int
+				}) *struct {
+					Struct
+
+					A string
+				} {
+					return &struct {
+						Struct
+
+						A string
+					}{A: strconv.Itoa(s.A)}
+				}),
+			},
+			[]interface{}{"12!"},
+			"",
+		},
+
+		{
+			"direct named converter (pointer, nil result)",
+			func(in struct {
+				Struct
+
+				A string
+			}) string {
+				return in.A + "!"
+			},
+			[]Arg{
+				Named("a", 12),
+				Converter(func(s struct {
+					Struct
+
+					A int
+				}) *struct {
+					Struct
+
+					A string
+				} {
+					return nil
+				}),
+			},
+			[]interface{}{"!"},
+			"",
+		},
+
+		{
 			"generic type converter",
 			func(in struct {
 				Struct

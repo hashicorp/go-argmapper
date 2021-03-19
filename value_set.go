@@ -410,8 +410,20 @@ func (t *ValueSet) empty() bool {
 // result takes the result that matches this struct type and adapts it
 // if necessary (if the struct type is lifted or so on).
 func (t *ValueSet) result(r Result) Result {
-	// If we aren't lifted, we return the result as-is.
+	// If we aren't lifted, we return the direct struct. We have to unwrap
+	// any pointers. We know this to be true already since we analyzed the
+	// function earlier.
 	if !t.lifted() {
+		for i := uint(0); i < t.structPointers; i++ {
+			r.out[0] = r.out[0].Elem()
+		}
+
+		// A nil result is equivalent to zero values, allocate the struct.
+		// This happens if there are pointer results and the user returns nil.
+		if !r.out[0].IsValid() {
+			r.out[0] = reflect.New(t.structType).Elem()
+		}
+
 		return r
 	}
 
@@ -532,7 +544,6 @@ func (v *structValue) CallIn() []reflect.Value {
 		// We do need to wrap the value in some pointers
 		val := v.value
 		for i := uint(0); i < v.typ.structPointers; i++ {
-			println(i)
 			val = val.Addr()
 		}
 
