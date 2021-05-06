@@ -278,6 +278,18 @@ func (vs *ValueSet) Values() []Value {
 	return result
 }
 
+// Args returns all of the values in this ValueSet as a slice of Arg to
+// make it easier to pass to Call. This is equivalent to iterating over
+// the Values result and accumulating Arg results.
+func (vs *ValueSet) Args() []Arg {
+	vals := vs.Values()
+	args := make([]Arg, len(vals))
+	for i, v := range vals {
+		args[i] = v.Arg()
+	}
+	return args
+}
+
 // Named returns a pointer to the value with the given name, or nil if
 // it doesn't exist.
 func (vs *ValueSet) Named(n string) *Value {
