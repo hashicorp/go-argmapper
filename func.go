@@ -143,6 +143,16 @@ func NewFuncList(fs []interface{}, opts ...Arg) ([]*Func, error) {
 // input and output with the argument values set. The cb should return
 // a populated ValueSet.
 func BuildFunc(input, output *ValueSet, cb func(in, out *ValueSet) error, opts ...Arg) (*Func, error) {
+	// If our input or output is nil, we set it to an allocated empty value set.
+	// This lets the caller always have a non-nil value but it may contain
+	// no values.
+	if input == nil {
+		input = &ValueSet{}
+	}
+	if output == nil {
+		output = &ValueSet{}
+	}
+
 	// Make our function type.
 	funcType := reflect.FuncOf(
 		input.Signature(),

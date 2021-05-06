@@ -309,6 +309,11 @@ func (vs *ValueSet) TypedSubtype(t reflect.Type, st string) *Value {
 // This is used for making dynamic types with reflect.FuncOf to take or return
 // this valueset.
 func (vs *ValueSet) Signature() []reflect.Type {
+	// If our value set is nil then we have no arguments.
+	if vs == nil {
+		return nil
+	}
+
 	if !vs.lifted() {
 		// This happens if the value has no values at all. In this case,
 		// our signature is also empty.
@@ -332,7 +337,7 @@ func (vs *ValueSet) Signature() []reflect.Type {
 // value is used.
 func (vs *ValueSet) SignatureValues() []reflect.Value {
 	// If typ is nil then there is no values
-	if vs.structType == nil {
+	if vs == nil || vs.structType == nil {
 		return nil
 	}
 

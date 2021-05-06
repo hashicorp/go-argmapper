@@ -1119,6 +1119,19 @@ func TestBuildFunc_noOutput(t *testing.T) {
 	require.NoError(f.Output().FromResult(f.Call(Named("a", 12))))
 }
 
+func TestBuildFunc_nilOutput(t *testing.T) {
+	require := require.New(t)
+
+	f, err := NewFunc(func(a int) {})
+	require.NoError(err)
+
+	f, err = BuildFunc(f.Input(), nil, func(in, out *ValueSet) error {
+		return nil
+	})
+	require.NoError(err)
+	require.NoError(f.Output().FromResult(f.Call(Named("a", 12))))
+}
+
 func TestBuildFunc_errValue(t *testing.T) {
 	require := require.New(t)
 
