@@ -423,7 +423,7 @@ func (t *ValueSet) lifted() bool {
 }
 
 func (t *ValueSet) empty() bool {
-	return t.structType == nil
+	return t.structType == nil || len(t.values) == 0
 }
 
 // result takes the result that matches this struct type and adapts it

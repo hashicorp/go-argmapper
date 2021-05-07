@@ -1044,6 +1044,54 @@ func TestFuncCall(t *testing.T) {
 			},
 			"",
 		},
+
+		{
+			"empty struct arg",
+			func(in struct {
+				Struct
+
+				A int `argmapper:",typeOnly,subtype=A"`
+				B int `argmapper:",typeOnly,subtype=B"`
+			}) error {
+				return nil
+			},
+			[]Arg{
+				// This empty struct arg was triggering a bug where this
+				// wasn't resolving properly so this test exercises that in
+				// an overly complex way.
+				Converter(func(struct {
+					Struct
+				}) (struct {
+					Struct
+
+					X int `argmapper:",typeOnly,subType=A"`
+				}, error) {
+					return struct {
+						Struct
+
+						X int `argmapper:",typeOnly,subType=A"`
+					}{X: 42}, nil
+				}),
+
+				Converter(func(struct {
+					Struct
+
+					X int `argmapper:",typeOnly,subType=A"`
+				}) (struct {
+					Struct
+
+					Y int `argmapper:",typeOnly,subType=B"`
+				}, error) {
+					return struct {
+						Struct
+
+						Y int `argmapper:",typeOnly,subType=B"`
+					}{Y: 84}, nil
+				}),
+			},
+			nil,
+			"",
+		},
 	}
 
 	for _, tt := range cases {
