@@ -28,6 +28,7 @@ type argBuilder struct {
 	filterOutput FilterFunc
 
 	funcName string
+	funcOnce bool
 }
 
 func newArgBuilder(opts ...Arg) (*argBuilder, error) {
@@ -203,6 +204,25 @@ func Logger(l hclog.Logger) Arg {
 func FuncName(n string) Arg {
 	return func(a *argBuilder) error {
 		a.funcName = n
+		return nil
+	}
+}
+
+// FuncOnce configures the function to be called at most once. The result of
+// a function call will be memoized and any future calls to the function
+// will return the memoized function.
+//
+// This is particularly useful if there is a complex converter that
+// may be required multiple times in a function call chain.
+//
+// The downside to this is that the result is memoized regardless of the
+// input arguments. Therefore, if the input arguments change, this function
+// will still not be called again. Users of this should be ABSOLUTELY SURE
+// that they want this function to run exactly once regardless of arguments
+// and return the same result every time.
+func FuncOnce() Arg {
+	return func(a *argBuilder) error {
+		a.funcOnce = true
 		return nil
 	}
 }

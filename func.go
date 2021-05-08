@@ -71,11 +71,23 @@ import (
 //     values which includes struct members and so on.
 //
 type Func struct {
-	fn       reflect.Value
-	input    *ValueSet
-	output   *ValueSet
-	callOpts []Arg
-	name     string
+	fn         reflect.Value
+	input      *ValueSet
+	output     *ValueSet
+	callOpts   []Arg
+	name       string
+	once       bool
+	onceResult *Result
+}
+
+// MustFunc can be called around NewFunc in order to force success and
+// panic if there is any error.
+func MustFunc(f *Func, err error) *Func {
+	if err != nil {
+		panic(err)
+	}
+
+	return f
 }
 
 // NewFunc creates a new Func from the given input function f.
@@ -120,6 +132,7 @@ func NewFunc(f interface{}, opts ...Arg) (*Func, error) {
 		output:   outTyp,
 		callOpts: opts,
 		name:     args.funcName,
+		once:     args.funcOnce,
 	}, nil
 }
 

@@ -514,6 +514,13 @@ func (f *Func) reachTarget(
 // with the given named arguments. This skips the whole graph creation
 // step by requiring args satisfy all required arguments.
 func (f *Func) callDirect(log hclog.Logger, argMap map[interface{}]reflect.Value) Result {
+	// If we have FuncOnce enabled and we've been called before, return
+	// the result we have cached.
+	if f.once && f.onceResult != nil {
+		log.Trace("returning cached result, FuncOnce enabled")
+		return *f.onceResult
+	}
+
 	// Initialize the struct we'll be populating
 	var buildErr error
 	structVal := f.input.newStructValue()
@@ -540,7 +547,14 @@ func (f *Func) callDirect(log hclog.Logger, argMap map[interface{}]reflect.Value
 	}
 
 	out := f.fn.Call(in)
-	return Result{out: out}
+	result := Result{out: out}
+
+	// If we have FuncOnce enabled, cache the result.
+	if f.once {
+		f.onceResult = &result
+	}
+
+	return result
 }
 
 // callState is the shared state for the execution of a single call.

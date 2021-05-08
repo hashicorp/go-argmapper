@@ -21,6 +21,9 @@ func TestFuncCall(t *testing.T) {
 	// Used in some test cases.
 	errSentinel := errors.New("error")
 
+	// State used for some tests, reset each call
+	var intState int
+
 	cases := []struct {
 		Name     string
 		Callback interface{}
@@ -1090,6 +1093,61 @@ func TestFuncCall(t *testing.T) {
 				}),
 			},
 			nil,
+			"",
+		},
+
+		//----------------------------------------------------------------
+		// Once
+
+		{
+			"once option",
+			func(in struct {
+				Struct
+
+				A     string
+				B     bool
+				State *int
+			}) string {
+				if !in.B {
+					panic("OH NO")
+				}
+
+				return strconv.Itoa(*in.State)
+			},
+			[]Arg{
+				Typed(&intState),
+				Named("b", 2),
+
+				ConverterFunc(MustFunc(NewFunc(func(b int, state *int) struct {
+					Struct
+
+					A int `argmapper:"A"`
+				} {
+					*state++
+
+					return struct {
+						Struct
+						A int `argmapper:"A"`
+					}{A: b * 2}
+				}, FuncOnce()))),
+
+				Converter(func(in struct {
+					Struct
+
+					A int `argmapper:"A"`
+				}) string {
+					return strconv.Itoa(in.A)
+				}),
+
+				Converter(func(in struct {
+					Struct
+
+					A int `argmapper:"A"`
+				}) bool {
+					return true
+				}),
+			},
+			[]interface{}{"1"},
 			"",
 		},
 	}
