@@ -96,10 +96,7 @@ func MustFunc(f *Func, err error) *Func {
 //
 // Additional opts can be provided. These will always be set when calling
 // Call. Any conflicting arguments given on Call will override these args.
-// This can be used to provide some initial values, converters, etc. Additional
-// options will be prepended to the call chain when using Call with converters.
-// opts is the equivalent to adding these options to the beginning of the
-// args list whenever any function is called with this as a converter.
+// This can be used to provide some initial values, converters, etc.
 func NewFunc(f interface{}, opts ...Arg) (*Func, error) {
 	args, err := newArgBuilder(opts...)
 	if err != nil {
