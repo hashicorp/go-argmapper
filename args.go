@@ -32,6 +32,11 @@ type argBuilder struct {
 }
 
 func newArgBuilder(opts ...Arg) (*argBuilder, error) {
+	// convAdded keeps track of the converter defaults we've added.
+	// This is keyed by the function name.
+	convAdded := map[string]struct{}{}
+
+REBUILD:
 	builder := &argBuilder{
 		logger:   hclog.L(),
 		named:    make(map[string]reflect.Value),
@@ -45,6 +50,25 @@ func newArgBuilder(opts ...Arg) (*argBuilder, error) {
 		if err := opt(builder); err != nil {
 			buildErr = multierror.Append(buildErr, err)
 		}
+	}
+
+	// Once we've built, go through and build all the options from our
+	// converter funcs and add them to our list. If we have any new options,
+	// we prepend them to our options (since they're defaults) and rebuild.
+	// We continue until we have no new options.
+	var newArgs []Arg
+	rebuild := false
+	for _, f := range builder.convs {
+		name := f.Name()
+		if _, ok := convAdded[name]; !ok {
+			rebuild = true
+			convAdded[name] = struct{}{}
+			newArgs = append(newArgs, f.callOpts...)
+		}
+	}
+	if rebuild {
+		opts = append(newArgs, opts...)
+		goto REBUILD
 	}
 
 	return builder, buildErr
