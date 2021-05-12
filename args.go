@@ -61,7 +61,12 @@ func Named(n string, v interface{}) Arg {
 	}
 
 	return func(a *argBuilder) error {
-		a.named[strings.ToLower(n)] = reflect.ValueOf(v)
+		rv := reflect.ValueOf(v)
+		if !rv.IsValid() {
+			return nil
+		}
+
+		a.named[strings.ToLower(n)] = rv
 		return nil
 	}
 }
@@ -79,11 +84,16 @@ func NamedSubtype(n string, v interface{}, st string) Arg {
 	}
 
 	return func(a *argBuilder) error {
+		rv := reflect.ValueOf(v)
+		if !rv.IsValid() {
+			return nil
+		}
+
 		n = strings.ToLower(n)
 		if a.namedSub[n] == nil {
 			a.namedSub[n] = map[string]reflect.Value{}
 		}
-		a.namedSub[n][st] = reflect.ValueOf(v)
+		a.namedSub[n][st] = rv
 		return nil
 	}
 }
@@ -95,7 +105,9 @@ func Typed(vs ...interface{}) Arg {
 	return func(a *argBuilder) error {
 		for _, v := range vs {
 			rv := reflect.ValueOf(v)
-			a.typed[rv.Type()] = rv
+			if rv.IsValid() {
+				a.typed[rv.Type()] = rv
+			}
 		}
 
 		return nil
@@ -111,6 +123,10 @@ func TypedSubtype(v interface{}, st string) Arg {
 
 	return func(a *argBuilder) error {
 		rv := reflect.ValueOf(v)
+		if !rv.IsValid() {
+			return nil
+		}
+
 		rt := rv.Type()
 		if a.typedSub[rt] == nil {
 			a.typedSub[rt] = map[string]reflect.Value{}
