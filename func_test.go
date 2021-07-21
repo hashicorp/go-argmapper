@@ -128,7 +128,7 @@ func TestFuncCall(t *testing.T) {
 				Named("a", 12),
 			},
 			nil,
-			"argument cannot",
+			"could not be satisfied",
 		},
 
 		{
@@ -719,7 +719,7 @@ func TestFuncCall(t *testing.T) {
 				NamedSubtype("a", 24, "bar"),
 			},
 			nil,
-			"argument cannot",
+			"could not be",
 		},
 
 		{
@@ -843,7 +843,7 @@ func TestFuncCall(t *testing.T) {
 				TypedSubtype(36, "bar"),
 			},
 			nil,
-			"cannot be",
+			"could not",
 		},
 
 		{
@@ -1165,6 +1165,7 @@ func TestFuncCall(t *testing.T) {
 				require.NoError(result.Err())
 			} else {
 				require.Error(result.Err())
+				t.Logf("err: %s", result.Err().Error())
 				require.Contains(result.Err().Error(), tt.Err)
 			}
 

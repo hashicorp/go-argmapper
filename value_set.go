@@ -505,10 +505,18 @@ func (v *Value) Kind() ValueKind {
 func (v *Value) String() string {
 	switch v.Kind() {
 	case ValueNamed:
-		return fmt.Sprintf("%q (type: %s)", v.Name, v.Type)
+		if v.Subtype == "" {
+			return fmt.Sprintf("name: %q (type: %s)", v.Name, v.Type)
+		} else {
+			return fmt.Sprintf("name: %q (type: %s, subtype: %s)", v.Name, v.Type, v.Subtype)
+		}
 
 	case ValueTyped:
-		return fmt.Sprintf("type %s", v.Type)
+		if v.Subtype == "" {
+			return fmt.Sprintf("type: %s", v.Type)
+		} else {
+			return fmt.Sprintf("type: %s (subtype: %s)", v.Type, v.Subtype)
+		}
 
 	default:
 		return fmt.Sprintf("%#v", v)

@@ -26,17 +26,35 @@ const (
 	weightMatchingName = -1
 )
 
+// valueConverter is the interface implemented by vertices that can
+// be represented by values. This is used to convert unexported vertex
+// implementations into user-friendly information about what they represent.
+type valueConverter interface {
+	value() *Value
+}
+
 // valueVertex represents any named and typed value.
 type valueVertex struct {
 	Name    string
 	Type    reflect.Type
 	Subtype string
-
-	Value reflect.Value
+	Value   reflect.Value
 }
 
 func (v *valueVertex) Hashcode() interface{} {
 	return fmt.Sprintf("%s/%s/%s", v.Name, v.Type.String(), v.Subtype)
+}
+
+// value returns the Value structures for this vertex. This is useful
+// for error messages and other points where we must convert this to an
+// exported, user-usable value.
+func (v *valueVertex) value() *Value {
+	return &Value{
+		Name:    v.Name,
+		Type:    v.Type,
+		Subtype: v.Subtype,
+		Value:   v.Value,
+	}
 }
 
 // funcVertex is our target function. There is only ever one of these
@@ -64,6 +82,16 @@ func (v *typedArgVertex) Hashcode() interface{} {
 
 func (v *typedArgVertex) String() string { return v.Hashcode().(string) }
 
+// See valueVertex.value
+func (v *typedArgVertex) value() *Value {
+	return &Value{
+		Name:    v.Name,
+		Type:    v.Type,
+		Subtype: v.Subtype,
+		Value:   v.Value,
+	}
+}
+
 // typedOutputVertex represents an output from a function that is typed
 // only and has no name. This can be inherited by any value with a matching
 // type.
@@ -86,6 +114,16 @@ func (v *typedOutputVertex) String() string {
 	}
 
 	return str
+}
+
+// See valueVertex.value
+func (v *typedOutputVertex) value() *Value {
+	return &Value{
+		Name:    v.Name,
+		Type:    v.Type,
+		Subtype: v.Subtype,
+		Value:   v.Value,
+	}
 }
 
 // rootVertex tracks the root of a function call. This should have

@@ -243,7 +243,10 @@ func FuncOnce() Arg {
 	}
 }
 
-func (b *argBuilder) graph(log hclog.Logger, g *graph.Graph, root graph.Vertex) []graph.Vertex {
+func (b *argBuilder) graph(log hclog.Logger, g *graph.Graph, root graph.Vertex) (
+	[]graph.Vertex, // input vertices
+	[]*Func, // converters
+) {
 	var result []graph.Vertex
 
 	// Add our named inputs
@@ -324,6 +327,8 @@ func (b *argBuilder) graph(log hclog.Logger, g *graph.Graph, root graph.Vertex) 
 	}
 
 	// If we have converter generators, run those.
+	convs := make([]*Func, len(b.convs))
+	copy(convs, b.convs)
 	if len(b.convGens) > 0 {
 		for _, vertex := range g.Vertices() {
 			// Get a value. If this vertex can't be represented by a value,
@@ -344,9 +349,11 @@ func (b *argBuilder) graph(log hclog.Logger, g *graph.Graph, root graph.Vertex) 
 					continue
 				}
 
+				convs = append(convs, f)
 				f.graph(g, root, true)
 			}
 		}
 	}
-	return result
+
+	return result, convs
 }

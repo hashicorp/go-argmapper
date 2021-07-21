@@ -60,7 +60,8 @@ func (f *Func) callGraph(args *argBuilder) (
 
 	// Next, we add "inputs", which are the given named values that
 	// we already know about. These are tracked as "vertexI".
-	vertexI = args.graph(log, &g, vertexRoot)
+	var convs []*Func
+	vertexI, convs = args.graph(log, &g, vertexRoot)
 
 	// Next, for all values we may have or produce, we need to create
 	// the vertices for the type-only value. This lets us say, for example,
@@ -274,28 +275,41 @@ func (f *Func) callGraph(args *argBuilder) (
 	// Go through all our inputs. If any aren't in the graph any longer
 	// it means there is no possible path to that input so it cannot be
 	// satisfied.
-	err = nil
+	var unsatisfied []*Value
 	for _, req := range vertexFreq {
 		if g.Vertex(graph.VertexID(req)) == nil {
-			name := graph.VertexName(req)
-			switch v := req.(type) {
-			case *valueVertex:
-				name = fmt.Sprintf("%q of type %s", v.Name, v.Type.String())
-				if v.Subtype != "" {
-					name += fmt.Sprintf(" (subtype: %q)", v.Subtype)
-				}
-
-			case *typedArgVertex:
-				name = fmt.Sprintf("type %s", v.Type.String())
-				if v.Subtype != "" {
-					name += fmt.Sprintf(" (subtype: %q)", v.Subtype)
-
-				}
+			valueable, ok := req.(valueConverter)
+			if !ok {
+				// This shouldn't be possible
+				panic(fmt.Sprintf("argmapper graph node doesn't implement value(): %T", req))
 			}
 
-			err = multierror.Append(err, fmt.Errorf(
-				"argument cannot be satisfied: %s", name))
+			unsatisfied = append(unsatisfied, valueable.value())
 		}
+	}
+
+	// If we have unsatisfied inputs, then put together the data we need to
+	// build our error result and return it.
+	if len(unsatisfied) > 0 {
+		// Build our list of direct inputs
+		var inputs []*Value
+		for _, v := range vertexI {
+			valueable, ok := v.(valueConverter)
+			if !ok {
+				// This shouldn't be possible
+				panic(fmt.Sprintf("argmapper graph node doesn't implement value(): %T", v))
+			}
+
+			inputs = append(inputs, valueable.value())
+		}
+
+		err = &ErrArgumentUnsatisfied{
+			Func:       f,
+			Args:       unsatisfied,
+			Inputs:     inputs,
+			Converters: convs,
+		}
+		return
 	}
 
 	return
