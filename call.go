@@ -29,12 +29,12 @@ func (f *Func) Call(opts ...Arg) Result {
 
 	// Reach our target function to get our arguments, performing any
 	// conversions necessary.
-	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, newCallState(), false)
+	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, newCallState(), false, builder.dryRun)
 	if err != nil {
 		return resultError(err)
 	}
 
-	return f.callDirect(log, argMap)
+	return f.callDirect(log, argMap, builder.dryRun)
 }
 
 // callGraph builds the common graph used by Call, Redefine, etc.
@@ -324,6 +324,7 @@ func (f *Func) reachTarget(
 	target graph.Vertex,
 	state *callState,
 	redefine bool,
+	dryRun bool,
 ) (map[interface{}]reflect.Value, error) {
 	log.Trace("reachTarget", "target", target)
 
@@ -490,13 +491,14 @@ func (f *Func) reachTarget(
 					v,
 					state,
 					redefine,
+					dryRun,
 				)
 				if err != nil {
 					return nil, err
 				}
 
 				// Call our function.
-				result := v.Func.callDirect(log, funcArgMap)
+				result := v.Func.callDirect(log, funcArgMap, dryRun)
 				if err := result.Err(); err != nil {
 					return nil, err
 				}
@@ -527,7 +529,11 @@ func (f *Func) reachTarget(
 // call -- the unexported version of Call -- calls the function directly
 // with the given named arguments. This skips the whole graph creation
 // step by requiring args satisfy all required arguments.
-func (f *Func) callDirect(log hclog.Logger, argMap map[interface{}]reflect.Value) Result {
+func (f *Func) callDirect(
+	log hclog.Logger,
+	argMap map[interface{}]reflect.Value,
+	dryRun bool,
+) Result {
 	// If we have FuncOnce enabled and we've been called before, return
 	// the result we have cached.
 	if f.once && f.onceResult != nil {
@@ -559,13 +565,30 @@ func (f *Func) callDirect(log hclog.Logger, argMap map[interface{}]reflect.Value
 		return Result{buildErr: buildErr}
 	}
 
+	// fn is the function we're going to call as a reflect.Value.
+	// If we're in dry run mode, we override this with a noop that
+	// just returns zero values for all its advertised outputs.
+	fn := f.fn
+	if dryRun {
+		fnType := fn.Type()
+		fn = reflect.MakeFunc(fnType, func(args []reflect.Value) []reflect.Value {
+			// Just return what we defined in the signature with all zero values.
+			out := make([]reflect.Value, fnType.NumOut())
+			for i := 0; i < len(out); i++ {
+				out[i] = reflect.Zero(fnType.Out(i))
+			}
+
+			return out
+		})
+	}
+
 	// Call our function
 	in := structVal.CallIn()
 	for i, arg := range in {
 		log.Trace("argument", "idx", i, "value", arg.Interface())
 	}
 
-	out := f.fn.Call(in)
+	out := fn.Call(in)
 	result := Result{out: out}
 
 	// If we have FuncOnce enabled, cache the result.

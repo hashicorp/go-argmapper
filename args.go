@@ -29,6 +29,8 @@ type argBuilder struct {
 
 	funcName string
 	funcOnce bool
+
+	dryRun bool
 }
 
 func newArgBuilder(opts ...Arg) (*argBuilder, error) {
@@ -239,6 +241,18 @@ func FuncName(n string) Arg {
 func FuncOnce() Arg {
 	return func(a *argBuilder) error {
 		a.funcOnce = true
+		return nil
+	}
+}
+
+// DryRun causes the target function and any converters to NOT be called.
+// This can be used to ensure that given a set of inputs a function CAN
+// theoretically be called, assuming no converters error in the middle. This
+// is a good way to test that all inputs can reach the target arguments for
+// the target function.
+func DryRun() Arg {
+	return func(a *argBuilder) error {
+		a.dryRun = true
 		return nil
 	}
 }

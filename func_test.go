@@ -1150,6 +1150,85 @@ func TestFuncCall(t *testing.T) {
 			[]interface{}{"1"},
 			"",
 		},
+
+		//----------------------------------------------------------------
+		// DryRun
+
+		{
+			"dry run with only target",
+			func(in struct {
+				Struct
+
+				A, B int
+			}) int {
+				panic("YOU CALLED ME!")
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 24),
+				DryRun(),
+			},
+			[]interface{}{
+				0, // the zero value
+			},
+			"",
+		},
+
+		{
+			"dry run with missing arg",
+			func(in struct {
+				Struct
+
+				A, B int
+			}) int {
+				panic("YOU CALLED ME!")
+			},
+			[]Arg{
+				Named("b", 24),
+				DryRun(),
+			},
+			[]interface{}{},
+			`"a" (type: int)`,
+		},
+
+		{
+			"dry run with type converter",
+			func(in struct {
+				Struct
+
+				A string
+				B int
+			}) string {
+				panic("CALLED")
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 2),
+				Converter(func(in int) string { panic("CALLED") }),
+				DryRun(),
+			},
+			[]interface{}{""},
+			"",
+		},
+
+		{
+			"dry run with mismatched type",
+			func(in struct {
+				Struct
+
+				A string
+				B int
+			}) string {
+				panic("CALLED")
+			},
+			[]Arg{
+				Named("a", 12),
+				Named("b", 2),
+				DryRun(),
+			},
+			[]interface{}{},
+			`"a" (type: string)`,
+		},
 	}
 
 	for _, tt := range cases {
