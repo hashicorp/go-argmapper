@@ -471,6 +471,19 @@ func TestFuncCall(t *testing.T) {
 		},
 
 		{
+			"multi-type converter with cycle",
+			func(a int, b string) string {
+				return b + strconv.Itoa(a)
+			},
+			[]Arg{
+				Typed("no: "),
+				Converter(func(int) (string, int) { return "yes: ", 12 }),
+			},
+			nil,
+			"could not be satisfied",
+		},
+
+		{
 			"unnecessary converters",
 			func(ctx context.Context, v string) string { return v },
 			[]Arg{
@@ -1211,6 +1224,70 @@ func TestBuildFunc(t *testing.T) {
 
 	require.NoError(output.FromResult(f.Call(Named("a", 12))))
 	require.Equal(24, output.Typed(intType).Value.Interface())
+}
+
+// This tests a cycle found while working on the Waypoint project.
+// We were using argmapper in a broken way so this should've never
+// worked but it caused an infinite loop instead. This test originally
+// infinite looped and remains to verify we don't regress.
+func TestBuildFunc_waypointCycle(t *testing.T) {
+	// This copies our behavior from Waypoint that triggered this bug.
+	type markerType struct{}
+	markerValue := func(n string) Value {
+		val := markerType(struct{}{})
+		return Value{
+			Type:    reflect.TypeOf(val),
+			Subtype: n,
+			Value:   reflect.ValueOf(val),
+		}
+	}
+
+	require := require.New(t)
+
+	intType := reflect.TypeOf(int(0))
+	stringType := reflect.TypeOf("")
+
+	// Input is (int, string)
+	input, err := NewValueSet([]Value{
+		{
+			Type: intType,
+		},
+		{
+			Type: stringType,
+		},
+	})
+	require.NoError(err)
+
+	// Output is (marker<"A">, int)
+	markerVal := markerValue("A")
+	output, err := NewValueSet([]Value{
+		markerVal,
+		{
+			Type: intType,
+		},
+	})
+	require.NoError(err)
+
+	// Our function does nothing
+	f, err := BuildFunc(input, output, func(in, out *ValueSet) error {
+		return nil
+	})
+	require.NoError(err)
+
+	// Our target function just wants the marker value.
+	input, err = NewValueSet([]Value{markerVal})
+	require.NoError(err)
+	target, err := BuildFunc(input, nil, func(in, out *ValueSet) error {
+		return nil
+	})
+	require.NoError(err)
+
+	// Input is the string and the converter.
+	result := target.Call(
+		Typed("hello"),
+		ConverterFunc(f),
+	)
+	require.NoError(result.Err())
 }
 
 func TestBuildFunc_noOutput(t *testing.T) {
