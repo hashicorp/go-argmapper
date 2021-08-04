@@ -1287,7 +1287,7 @@ func TestBuildFunc_waypointCycle(t *testing.T) {
 		Typed("hello"),
 		ConverterFunc(f),
 	)
-	require.NoError(result.Err())
+	require.Error(result.Err())
 }
 
 func TestBuildFunc_noOutput(t *testing.T) {

@@ -366,6 +366,11 @@ func (f *Func) reachTarget(
 		return argMap, nil
 	}
 
+	// It is possible that we detect unsatisfied values here. This is rare
+	// since the initial graph build catches most cases, but in advanced
+	// Waypoint usage it happens here.
+	var unsatisfied []*Value
+
 	paths := make([][]graph.Vertex, len(vertexT))
 	for i, current := range vertexT {
 		currentG := g
@@ -398,6 +403,19 @@ func (f *Func) reachTarget(
 			input = paths[i][1]
 		}
 
+		// If the path contains ourself, then this target is unsatisfied.
+		for _, v := range paths[i] {
+			if v == target {
+				valueable, ok := current.(valueConverter)
+				if !ok {
+					// This shouldn't be possible
+					panic(fmt.Sprintf("argmapper graph node doesn't implement value(): %T", current))
+				}
+
+				unsatisfied = append(unsatisfied, valueable.value())
+			}
+		}
+
 		// Store our input used
 		state.InputSet[graph.VertexID(input)] = input
 
@@ -414,6 +432,18 @@ func (f *Func) reachTarget(
 			case *typedArgVertex:
 				v.Value = reflect.Zero(v.Type)
 			}
+		}
+	}
+
+	// If we have any unsatisfied values, error.
+	if len(unsatisfied) > 0 {
+		return nil, &ErrArgumentUnsatisfied{
+			Func: f,
+			Args: unsatisfied,
+
+			// NOTE(mitchellh): This doesn't populate Inputs and Convs
+			// which is theoretically possible but a lot more difficult.
+			// Given this error is relatively rare, we can tackle this later.
 		}
 	}
 
