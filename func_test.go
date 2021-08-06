@@ -519,6 +519,30 @@ func TestFuncCall(t *testing.T) {
 			"",
 		},
 
+		{
+			"multi value converters with cycle",
+			func(a int) int { return a },
+			[]Arg{
+				Typed("unused"),
+				Converter(func(v []int, _ string) int { return v[0] }),
+				Converter(func(v int, _ string) []int { return []int{v} }),
+			},
+			nil,
+			"could not be satisfied",
+		},
+
+		{
+			"multi value converters",
+			func(a int) int { return a },
+			[]Arg{
+				Typed("custom-unused"),
+				Converter(func(v []int, _ string) int { return v[0] }),
+				Converter(func(s string) []int { return []int{2} }),
+			},
+			[]interface{}{2},
+			"",
+		},
+
 		//-----------------------------------------------------------
 		// TYPE CONVERTER STRUCTS
 
