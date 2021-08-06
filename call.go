@@ -371,7 +371,26 @@ func (f *Func) reachTarget(
 	// Waypoint usage it happens here.
 	var unsatisfied []*Value
 
+	// Converters with multiple input values can end up stuck
+	// in a cycle when an input is missing for ConverterA and
+	// ConverterB output type is a match, but ConverterB requires
+	// and input that matches ConverterA output
+	var targetFn *funcVertex
+	var targetOut Value
+	targetOutVerified := false
+
+	// We only setup the targetOut and targetFn values if only a single
+	// path will be generated, since it's the only time we need to validate
+	// there is not a cycle with the current target
+	if len(vertexT) == 1 {
+		if tf, ok := target.(*funcVertex); ok && len(tf.Func.Output().Values()) > 0 {
+			targetOut = tf.Func.Output().Values()[0]
+			targetFn = tf
+		}
+	}
+
 	paths := make([][]graph.Vertex, len(vertexT))
+
 	for i, current := range vertexT {
 		currentG := g
 
@@ -389,7 +408,7 @@ func (f *Func) reachTarget(
 			}
 		}
 
-		// Recalculate the shortest path information since we may changed
+		// Recalculate the shortest path information since we may have changed
 		// the graph above.
 		_, edgeTo := currentG.Reverse().Dijkstra(root)
 
@@ -403,9 +422,32 @@ func (f *Func) reachTarget(
 			input = paths[i][1]
 		}
 
-		// If the path contains ourself, then this target is unsatisfied.
 		for _, v := range paths[i] {
+			satisfied := true
+
+			// If the output type of the current target is required as an input
+			// type within the new path, and no set values are able to satisfy
+			// it, then the path is invalid and the target is unsatisfied
+			if targetFn != nil && !targetOutVerified {
+				if newFn, ok := v.(*funcVertex); ok {
+					for _, inV := range newFn.Func.Input().Values() {
+						if inV.Type == targetOut.Type {
+							satisfied = false
+						}
+					}
+				} else if newVal, ok := v.(valueConverter); ok {
+					if newVal.value().Type == targetOut.Type {
+						targetOutVerified = true
+					}
+				}
+			}
+
+			// If the path contains ourself, then this target is unsatisfied.
 			if v == target {
+				satisfied = false
+			}
+
+			if !satisfied {
 				valueable, ok := current.(valueConverter)
 				if !ok {
 					// This shouldn't be possible
