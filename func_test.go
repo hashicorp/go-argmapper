@@ -543,6 +543,18 @@ func TestFuncCall(t *testing.T) {
 			"",
 		},
 
+		{
+			"multi value converters with different types",
+			func(a int) int { return a },
+			[]Arg{
+				Typed("unused-string"),
+				Converter(func(v []int, _ string) int { return v[0] }),
+				Converter(func(x float32) []int { return []int{int(x)} }),
+			},
+			nil,
+			"could not be satisfied",
+		},
+
 		//-----------------------------------------------------------
 		// TYPE CONVERTER STRUCTS
 
