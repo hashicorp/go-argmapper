@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+
+	"github.com/hashicorp/go-argmapper/internal/graph"
+	"github.com/hashicorp/go-multierror"
 )
 
 // ErrArgumentUnsatisfied is the value returned when there is an argument
@@ -101,6 +104,48 @@ for debugging.
 		strings.TrimSuffix(inputs.String(), "\n"),
 		strings.TrimSuffix(convs.String(), "\n"),
 	)
+}
+
+// Updates the given error if it is an ErrArgumentUnsatisfied error
+// with the input values and converter functions if they have not
+// already been set.
+func populateUnsatisfiedError(
+	vertexI []graph.Vertex, // list of input vertices
+	convs []*Func, // list of converter functions
+	uErr error, // error to update
+) error {
+	var errs []error
+	if merr, ok := uErr.(*multierror.Error); ok {
+		errs = merr.Errors
+	} else {
+		errs = []error{uErr}
+	}
+	for _, errI := range errs {
+		err, ok := errI.(*ErrArgumentUnsatisfied)
+		if !ok {
+			continue
+		}
+
+		if len(convs) > 0 && (err.Converters == nil || len(err.Converters) == 0) {
+			err.Converters = convs
+		}
+
+		if len(vertexI) > 0 && (err.Inputs == nil || len(err.Inputs) == 0) {
+			var inputs []*Value
+			for _, v := range vertexI {
+				valueable, ok := v.(valueConverter)
+				if !ok {
+					// This shouldn't be possible
+					panic(fmt.Sprintf("argmapper graph node doesn't implement value(): %T", v))
+				}
+
+				inputs = append(inputs, valueable.value())
+			}
+			err.Inputs = inputs
+		}
+	}
+
+	return uErr
 }
 
 var _ error = (*ErrArgumentUnsatisfied)(nil)

@@ -127,8 +127,9 @@ func (f *Func) redefineInputs(opts ...Arg) (reflect.Type, error) {
 	log := builder.logger
 
 	// Get our call graph
-	g, vertexRoot, vertexF, vertexI, err := f.callGraph(builder)
+	g, vertexRoot, vertexF, vertexI, convs, err := f.callGraph(builder)
 	if err != nil {
+		populateUnsatisfiedError(vertexI, convs, err)
 		return nil, err
 	}
 
