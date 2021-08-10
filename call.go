@@ -22,8 +22,9 @@ func (f *Func) Call(opts ...Arg) Result {
 	log.Trace("call")
 
 	// Build our call graph
-	g, vertexRoot, vertexF, _, err := f.callGraph(builder)
+	g, vertexRoot, vertexF, vertexI, convs, err := f.callGraph(builder)
 	if err != nil {
+		populateUnsatisfiedError(vertexI, convs, err)
 		return resultError(err)
 	}
 
@@ -31,10 +32,16 @@ func (f *Func) Call(opts ...Arg) Result {
 	// conversions necessary.
 	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, newCallState(), false)
 	if err != nil {
+		populateUnsatisfiedError(vertexI, convs, err)
 		return resultError(err)
 	}
 
-	return f.callDirect(log, argMap)
+	result := f.callDirect(log, argMap)
+	if result.Err() != nil {
+		populateUnsatisfiedError(vertexI, convs, result.Err())
+	}
+
+	return result
 }
 
 // callGraph builds the common graph used by Call, Redefine, etc.
@@ -43,6 +50,7 @@ func (f *Func) callGraph(args *argBuilder) (
 	vertexRoot graph.Vertex,
 	vertexF graph.Vertex,
 	vertexI []graph.Vertex,
+	convs []*Func,
 	err error,
 ) {
 	log := args.logger
@@ -60,7 +68,6 @@ func (f *Func) callGraph(args *argBuilder) (
 
 	// Next, we add "inputs", which are the given named values that
 	// we already know about. These are tracked as "vertexI".
-	var convs []*Func
 	vertexI, convs = args.graph(log, &g, vertexRoot)
 
 	// Next, for all values we may have or produce, we need to create
@@ -291,23 +298,9 @@ func (f *Func) callGraph(args *argBuilder) (
 	// If we have unsatisfied inputs, then put together the data we need to
 	// build our error result and return it.
 	if len(unsatisfied) > 0 {
-		// Build our list of direct inputs
-		var inputs []*Value
-		for _, v := range vertexI {
-			valueable, ok := v.(valueConverter)
-			if !ok {
-				// This shouldn't be possible
-				panic(fmt.Sprintf("argmapper graph node doesn't implement value(): %T", v))
-			}
-
-			inputs = append(inputs, valueable.value())
-		}
-
 		err = &ErrArgumentUnsatisfied{
-			Func:       f,
-			Args:       unsatisfied,
-			Inputs:     inputs,
-			Converters: convs,
+			Func: f,
+			Args: unsatisfied,
 		}
 		return
 	}
