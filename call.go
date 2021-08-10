@@ -606,13 +606,13 @@ func (f *Func) callDirect(log hclog.Logger, argMap map[interface{}]reflect.Value
 	for _, val := range f.input.values {
 		arg, ok := argMap[graph.VertexID(val.vertex())]
 		if !ok {
-			// This should never happen because we catch unsatisfied errors
-			// earlier in the process. Because of this, we output a message
-			// that there is a bug.
-			buildErr = multierror.Append(buildErr, fmt.Errorf(
-				"argument cannot be satisfied: %s. This is a bug in "+
-					"the go-argmapper library since this shouldn't happen at this "+
-					"point.", val.String()))
+			// This can happen when a converter is able to fulfill a requirement
+			// but only part of its input requirements were provided. Since the
+			// value cannot be reached we can set an error of unsatisfied.
+			buildErr = multierror.Append(buildErr, &ErrArgumentUnsatisfied{
+				Func: f,
+				Args: []*Value{val},
+			})
 			continue
 		}
 
