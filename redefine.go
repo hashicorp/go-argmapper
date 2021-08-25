@@ -106,7 +106,9 @@ func (f *Func) Redefine(opts ...Arg) (*Func, error) {
 		return out
 	})
 
-	return NewFunc(fn.Interface())
+	return NewFunc(fn.Interface(),
+		FuncName(f.Name()), // Preserve the name from the original func
+	)
 }
 
 // redefineInputs is called by Redefine to determine the input struct type
