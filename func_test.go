@@ -1385,3 +1385,82 @@ func TestFunc_defaultOpts(t *testing.T) {
 	require.NoError(t, result.Err())
 	require.Equal(t, "42", result.Out(0))
 }
+
+func Test_resourceManagerRepro(t *testing.T) {
+	require := require.New(t)
+
+	repro := func() {
+		arg := Typed(1)
+
+		baseArg := Value{
+			Type: reflect.TypeOf(1),
+			Value: reflect.ValueOf(1),
+		}
+
+		markerA := Value{
+			Type: reflect.TypeOf("A"),
+			Subtype: "A",
+			Value: reflect.ValueOf("A"),
+		}
+
+		markerB := Value{
+			Type: reflect.TypeOf("B"),
+			Subtype: "B",
+			Value: reflect.ValueOf("B"),
+		}
+
+		markerC := Value{
+			Type: reflect.TypeOf("C"),
+			Subtype: "C",
+			Value: reflect.ValueOf("C"),
+		}
+
+		// A has no dependencies
+		aIn, err := NewValueSet([]Value{baseArg})
+		require.NoError(err)
+		aOut, err := NewValueSet([]Value{markerA})
+		require.NoError(err)
+		aFunc, err := BuildFunc(aIn, aOut, func(in, out *ValueSet) error {return nil}, arg)
+		require.NoError(err)
+
+		// B depends on A
+		bIn, err := NewValueSet([]Value{baseArg, markerA})
+		require.NoError(err)
+		bOut, err := NewValueSet([]Value{markerB})
+		require.NoError(err)
+		bFunc, err := BuildFunc(bIn, bOut, func(in, out *ValueSet) error {return nil}, arg)
+		require.NoError(err)
+
+		// C depends on A and B
+		cIn, err := NewValueSet([]Value{baseArg, markerA, markerB})
+		require.NoError(err)
+		cOut, err := NewValueSet([]Value{markerC})
+		require.NoError(err)
+		cFunc, err := BuildFunc(cIn, cOut, func(in, out *ValueSet) error {return nil}, arg)
+		require.NoError(err)
+
+
+		mapperArgs := []Arg{
+			arg,
+			ConverterFunc(aFunc),
+			ConverterFunc(bFunc),
+			ConverterFunc(cFunc),
+		}
+
+		finalFuncIn, err := NewValueSet([]Value{markerA, markerB, markerC})
+		require.NoError(err)
+		finalFunc, err := BuildFunc(finalFuncIn, nil, func(in, out *ValueSet) error {return nil})
+		require.NoError(err)
+
+		result := finalFunc.Call(mapperArgs...)
+		require.NoError(result.Err())
+	}
+
+	//repro()
+
+	for i := 0; i < 1000; i++ {
+		t.Log(fmt.Sprintf("Iteration %d", i))
+		repro()
+	}
+
+}
