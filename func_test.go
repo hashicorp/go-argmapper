@@ -1227,6 +1227,72 @@ func TestFuncCall(t *testing.T) {
 	}
 }
 
+// This tests a regression we found with argmapper after merging PR #9.
+// This fails with PR #9 merged and passes without it. We added this test
+// so that can revert PR #9 and safely merge a new fix when this also passes.
+func TestFuncCall_waypointRepro(t *testing.T) {
+	type aIn struct {
+		Struct
+		N int      `argmapper:",typeOnly"`
+		C struct{} `argmapper:",typeOnly,subtype=C"`
+		B struct{} `argmapper:",typeOnly,subtype=B"`
+	}
+	type aOut struct {
+		Struct
+		A struct{} `argmapper:",typeOnly,subtype=A"`
+	}
+
+	type bIn struct {
+		Struct
+		N int      `argmapper:",typeOnly"`
+		C struct{} `argmapper:",typeOnly,subtype=C"`
+	}
+	type bOut struct {
+		Struct
+		B struct{} `argmapper:",typeOnly,subtype=B"`
+	}
+
+	type cIn struct {
+		Struct
+		N int `argmapper:",typeOnly"`
+	}
+	type cOut struct {
+		Struct
+		C struct{} `argmapper:",typeOnly,subtype=C"`
+	}
+
+	type targetIn struct {
+		Struct
+
+		// Note: this is the crux of the test: this ordering matters.
+		C struct{} `argmapper:",typeOnly,subtype=C"`
+		A struct{} `argmapper:",typeOnly,subtype=A"`
+		B struct{} `argmapper:",typeOnly,subtype=B"`
+	}
+
+	a := MustFunc(NewFunc(func(aIn) (aOut, error) {
+		return aOut{A: struct{}{}}, nil
+	}))
+	b := MustFunc(NewFunc(func(bIn) (bOut, error) {
+		return bOut{B: struct{}{}}, nil
+	}))
+	c := MustFunc(NewFunc(func(cIn) (cOut, error) {
+		return cOut{C: struct{}{}}, nil
+	}))
+
+	target := MustFunc(NewFunc(func(targetIn) error {
+		return nil
+	}))
+
+	for i := 0; i < 100; i++ {
+		result := target.Call(
+			Typed(int(42)),
+			ConverterFunc(c, a, b),
+		)
+		require.NoError(t, result.Err())
+	}
+}
+
 func TestBuildFunc(t *testing.T) {
 	require := require.New(t)
 
