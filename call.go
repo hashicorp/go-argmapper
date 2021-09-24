@@ -390,15 +390,24 @@ func (f *Func) reachTarget(
 	// Waypoint usage it happens here.
 	var unsatisfied []*Value
 
+	// Start with creating a copy of our graph and removing the current target.
+	// This will allow us to resolve any extra required paths while ensuring
+	// the resolved path doesn't result in a cycle.
+	baseG := g.Copy()
+	baseG.Remove(target)
+
+	// Set our currentG to the baseG. The currentG may be replaced below if
+	// the graph needs to be re-weighted.
+	currentG := baseG
+
 	paths := make([][]graph.Vertex, len(vertexT))
 	for i, current := range vertexT {
-		currentG := g
-
 		// For value vertices, we discount any other values that share the
 		// same name. This lets our shortest paths prefer matching through
 		// same-named arguments.
 		if currentValue, ok := current.(*valueVertex); ok {
-			currentG = currentG.Copy()
+			// Copy in the base graph so we can re-weight based on name
+			currentG = baseG.Copy()
 			for _, raw := range currentG.Vertices() {
 				if v, ok := raw.(*valueVertex); ok && v.Name == currentValue.Name {
 					for _, src := range currentG.InEdges(raw) {
@@ -416,15 +425,33 @@ func (f *Func) reachTarget(
 		paths[i] = currentG.EdgeToPath(current, edgeTo)
 		log.Trace("path for target", "target", current, "path", paths[i])
 
-		// Get the input
-		input := paths[i][0]
-		if _, ok := input.(*rootVertex); ok && len(paths[i]) > 1 {
-			input = paths[i][1]
+		// The path that is generated should start with the defined root vertex and
+		// end with the current vertex. If the path does not, then the path itself
+		// is invalid and the current vertex is deemed unsatisfied
+		if paths[i][0] != root || paths[i][len(paths[i])-1] != current {
+			log.Trace("invalid path generated", "root", root, "target", target, "path", paths[i])
+
+			valueable, ok := current.(valueConverter)
+			if !ok {
+				// This shouldn't be possible
+				panic(fmt.Sprintf("argmapper graph node doesn't implement value(): %T", current))
+			}
+
+			unsatisfied = append(unsatisfied, valueable.value())
+			continue
 		}
 
-		// If the path contains ourself, then this target is unsatisfied.
-		for _, v := range paths[i] {
-			if v == target {
+		// Cycle through all vertices in the path. For any funcVertex vertices that
+		// are found, validate all their inputs can successfully reach the root vertex.
+		for _, raw := range paths[i] {
+			if _, ok := raw.(*funcVertex); !ok {
+				continue
+			}
+
+			if !f.rootReachable(log, currentG, root, raw) {
+				log.Trace("all inputs for function can not resolve to root",
+					"root", root, "func", raw, "path", paths[i])
+
 				valueable, ok := current.(valueConverter)
 				if !ok {
 					// This shouldn't be possible
@@ -432,7 +459,14 @@ func (f *Func) reachTarget(
 				}
 
 				unsatisfied = append(unsatisfied, valueable.value())
+				break
 			}
+		}
+
+		// Get the input
+		input := paths[i][0]
+		if _, ok := input.(*rootVertex); ok && len(paths[i]) > 1 {
+			input = paths[i][1]
 		}
 
 		// Store our input used
@@ -571,6 +605,47 @@ func (f *Func) reachTarget(
 
 	// Reached our goal
 	return argMap, nil
+}
+
+func (f *Func) rootReachable(
+	log hclog.Logger,
+	g *graph.Graph,
+	root graph.Vertex,
+	target graph.Vertex,
+) bool {
+	outEdges := g.OutEdges(target)
+	if len(outEdges) < 2 {
+		return true
+	}
+
+	// Start with a copy that has our target vertex removed
+	g = g.Copy()
+	g.Remove(target)
+	// Calculate shortest path information with modifed graph
+	_, edgeTo := g.Reverse().Dijkstra(root)
+
+	// Now test all our edges to validate they can reach the root vertex
+	for _, v := range outEdges {
+		checkPath := g.EdgeToPath(v, edgeTo)
+		if checkPath[0] != root || checkPath[len(checkPath)-1] != v {
+			log.Trace("invalid path generated checking root reachability",
+				"root", root, "target", target, "path", checkPath)
+			return false
+		}
+		// Since other funcVertex vertices could be present in the checked
+		// path, locate them and validate they can properly reach the root
+		// vertex as well.
+		for _, cv := range checkPath {
+			if _, ok := cv.(*funcVertex); !ok {
+				continue
+			}
+			if !f.rootReachable(log, g, root, cv) {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // call -- the unexported version of Call -- calls the function directly
