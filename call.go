@@ -273,6 +273,22 @@ func (f *Func) callGraph(args *argBuilder) (
 			g.Remove(v)
 		}
 	}
+
+	// Finally, run through all funcVertex vertices and remove any that
+	// do not have out edges for all inputs
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*funcVertex)
+		if !ok {
+			continue
+		}
+		outs := g.OutEdges(v)
+		if len(outs) == 1 && outs[0] == vertexRoot {
+			continue
+		}
+		if len(v.Func.Input().Values()) != len(g.OutEdges(v)) {
+			g.Remove(v)
+		}
+	}
 	log.Trace("graph after input DFS", "graph", g.String())
 
 	// Go through all our inputs. If any aren't in the graph any longer
