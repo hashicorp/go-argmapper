@@ -25,14 +25,14 @@ func (f *Func) Call(opts ...Arg) Result {
 	log.Trace("call")
 
 	// Build our call graph
-	g, vertexRoot, vertexF, _, err := f.callGraph(builder)
+	g, vertexRoot, vertexF, vertexI, convs, err := f.callGraph(builder)
 	if err != nil {
 		return resultError(err)
 	}
 
 	// Reach our target function to get our arguments, performing any
 	// conversions necessary.
-	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, newCallState(), false)
+	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, newCallState(vertexI, convs), false)
 	if err != nil {
 		return resultError(err)
 	}
@@ -46,6 +46,7 @@ func (f *Func) callGraph(args *argBuilder) (
 	vertexRoot graph.Vertex,
 	vertexF graph.Vertex,
 	vertexI []graph.Vertex,
+	convs []*Func,
 	err error,
 ) {
 	log := args.logger
@@ -63,7 +64,6 @@ func (f *Func) callGraph(args *argBuilder) (
 
 	// Next, we add "inputs", which are the given named values that
 	// we already know about. These are tracked as "vertexI".
-	var convs []*Func
 	vertexI, convs = args.graph(log, &g, vertexRoot)
 
 	// Next, for all values we may have or produce, we need to create
@@ -490,13 +490,22 @@ func (f *Func) reachTarget(
 
 	// If we have any unsatisfied values, error.
 	if len(unsatisfied) > 0 {
-		return nil, &ErrArgumentUnsatisfied{
-			Func: f,
-			Args: unsatisfied,
+		var inputs []*Value
+		for _, v := range state.inputs {
+			valueable, ok := v.(valueConverter)
+			if !ok {
+				// This shouldn't be possible
+				panic(fmt.Sprintf("argmapper graph node doesn't implement value(): %T", v))
+			}
 
-			// NOTE(mitchellh): This doesn't populate Inputs and Convs
-			// which is theoretically possible but a lot more difficult.
-			// Given this error is relatively rare, we can tackle this later.
+			inputs = append(inputs, valueable.value())
+		}
+
+		return nil, &ErrArgumentUnsatisfied{
+			Func:       f,
+			Args:       unsatisfied,
+			Inputs:     inputs,
+			Converters: state.converters,
 		}
 	}
 
@@ -712,14 +721,26 @@ type callState struct {
 	// we can set the typedVertex values properly.
 	Value reflect.Value
 
+	// inputs holds the list of input vertices defined in the
+	// graph (used for error output)
+	inputs []graph.Vertex
+	// converts holds the list of converter functions defined
+	// (used for error output)
+	converters []*Func
+
 	// TODO
 	InputSet map[interface{}]graph.Vertex
 }
 
-func newCallState() *callState {
+func newCallState(
+	i []graph.Vertex, // list of input value vertices in graph
+	c []*Func, // list of converter funcs available
+) *callState {
 	return &callState{
 		NamedValue: map[string]reflect.Value{},
 		TypedValue: map[reflect.Type]reflect.Value{},
 		InputSet:   map[interface{}]graph.Vertex{},
+		inputs:     i,
+		converters: c,
 	}
 }
