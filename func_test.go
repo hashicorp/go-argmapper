@@ -1382,6 +1382,16 @@ func TestBuildFunc_nilOutput(t *testing.T) {
 	require.NoError(f.Output().FromResult(f.Call(Named("a", 12))))
 }
 
+func TestBuildFunc_nilInput(t *testing.T) {
+	require := require.New(t)
+
+	f, err := NewFunc(func(a *int) {})
+	require.NoError(err)
+
+	// Should not panic with a nil arg
+	require.Error(f.Output().FromResult(f.Call(nil)))
+}
+
 func TestBuildFunc_errValue(t *testing.T) {
 	require := require.New(t)
 
