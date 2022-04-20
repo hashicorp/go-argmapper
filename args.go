@@ -1,7 +1,7 @@
 package argmapper
 
 import (
-	"fmt"
+	"errors"
 	"reflect"
 	"strings"
 
@@ -44,7 +44,7 @@ func newArgBuilder(opts ...Arg) (*argBuilder, error) {
 	var buildErr error
 	for _, opt := range opts {
 		if opt == nil {
-			return nil, fmt.Errorf("arg cannot be nil")
+			return nil, errors.New("arg cannot be nil")
 		}
 		if err := opt(builder); err != nil {
 			buildErr = multierror.Append(buildErr, err)
