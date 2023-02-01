@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 // Package argmapper is a dependency-injection library for Go.
 //
 // go-argmapper supports named values, typed values, automatically chaining
