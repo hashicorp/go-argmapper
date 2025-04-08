@@ -21,7 +21,7 @@ func (g *Graph) Dijkstra(src Vertex) (distTo map[interface{}]int, edgeTo map[int
 	*/
 	queue := make(distQueue, 0, len(g.hash))
 	queueItem := map[interface{}]*distQueueItem{}
-	for k, _ := range g.hash {
+	for k := range g.hash {
 		item := &distQueueItem{
 			v:        k,
 			distance: math.MaxInt32,

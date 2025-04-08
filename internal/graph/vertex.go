@@ -24,7 +24,7 @@ func VertexID(v Vertex) interface{} {
 func VertexName(v Vertex) string {
 	switch v := v.(type) {
 	case fmt.Stringer:
-		return fmt.Sprintf("%s", v)
+		return v.String()
 	default:
 		return fmt.Sprintf("%v", v)
 	}
