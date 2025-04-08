@@ -255,7 +255,7 @@ func (f *Func) callGraph(args *argBuilder) (
 		// other zero index topo sort value.
 		graph.VertexID(vertexRoot): struct{}{},
 	}
-	g.Reverse().DFS(vertexRoot, func(v graph.Vertex, next func() error) error {
+	err = g.Reverse().DFS(vertexRoot, func(v graph.Vertex, next func() error) error {
 		visited[graph.VertexID(v)] = struct{}{}
 
 		if v == vertexF {
@@ -263,6 +263,9 @@ func (f *Func) callGraph(args *argBuilder) (
 		}
 		return next()
 	})
+	if err != nil {
+		log.Error(err.Error())
+	}
 
 	// Remove all the non-visited vertices. After this, what we'll have
 	// is a graph that has many paths getting us from inputs to function,
