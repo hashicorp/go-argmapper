@@ -187,9 +187,7 @@ type ConverterGenFunc func(Value) (*Func, error)
 // If the function returns a nil Func, then no converter is generated.
 func ConverterGen(fs ...ConverterGenFunc) Arg {
 	return func(a *argBuilder) error {
-		for _, f := range fs {
-			a.convGens = append(a.convGens, f)
-		}
+		a.convGens = append(a.convGens, fs...)
 		return nil
 	}
 }
