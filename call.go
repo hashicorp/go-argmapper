@@ -225,7 +225,6 @@ func (f *Func) callGraph(args *argBuilder) (
 			include := true
 			if args.filterInput != nil && !args.filterInput(value) {
 				log.Trace("excluding input due to failed filter", "value", value)
-				include = false
 				continue
 			}
 
@@ -255,7 +254,7 @@ func (f *Func) callGraph(args *argBuilder) (
 		// other zero index topo sort value.
 		graph.VertexID(vertexRoot): struct{}{},
 	}
-	g.Reverse().DFS(vertexRoot, func(v graph.Vertex, next func() error) error {
+	_ = g.Reverse().DFS(vertexRoot, func(v graph.Vertex, next func() error) error {
 		visited[graph.VertexID(v)] = struct{}{}
 
 		if v == vertexF {
@@ -577,6 +576,7 @@ func (f *Func) callDirect(log hclog.Logger, argMap map[interface{}]reflect.Value
 			// This should never happen because we catch unsatisfied errors
 			// earlier in the process. Because of this, we output a message
 			// that there is a bug.
+			//nolint:staticcheck // ST1005 Consumers maybe relying on the error message.
 			buildErr = multierror.Append(buildErr, fmt.Errorf(
 				"argument cannot be satisfied: %s. This is a bug in "+
 					"the go-argmapper library since this shouldn't happen at this "+

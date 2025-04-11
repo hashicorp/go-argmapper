@@ -12,6 +12,7 @@ import (
 
 const (
 	// weightNormal is the typcal edge weight.
+	//nolint:unused
 	weightNormal = 1
 
 	// weightTyped is the weight to use for edges that connected to any

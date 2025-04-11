@@ -1414,6 +1414,7 @@ func TestBuildFunc_errValue(t *testing.T) {
 	f, err = BuildFunc(input, f.Output(), func(in, out *ValueSet) error {
 		return fmt.Errorf("some error")
 	})
+	require.NoError(err)
 
 	require.EqualError(f.Output().FromResult(f.Call(Named("a", 12))), "some error")
 }
