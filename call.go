@@ -318,7 +318,7 @@ func (f *Func) callGraph(args *argBuilder) (
 	return
 }
 
-// reachTarget executes the the given funcVertex by ensuring we satisfy
+// reachTarget executes the given funcVertex by ensuring we satisfy
 // all the inbound arguments first and then calling it.
 func (f *Func) reachTarget(
 	log hclog.Logger,
