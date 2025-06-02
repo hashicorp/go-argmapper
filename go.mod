@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	github.com/hashicorp/go-hclog v0.14.0
-	github.com/hashicorp/go-multierror v1.1.0
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/stretchr/testify v1.5.1
 )
 
