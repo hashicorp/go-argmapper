@@ -1,4 +1,4 @@
-## unreleased
+## Unreleased
 
 ### Improvements
 
