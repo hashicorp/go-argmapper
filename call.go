@@ -25,14 +25,14 @@ func (f *Func) Call(opts ...Arg) Result {
 	log.Trace("call")
 
 	// Build our call graph
-	g, vertexRoot, vertexF, _, err := f.callGraph(builder)
+	g, vertexRoot, vertexF, vertexI, convs, err := f.callGraph(builder)
 	if err != nil {
 		return resultError(err)
 	}
 
 	// Reach our target function to get our arguments, performing any
 	// conversions necessary.
-	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, newCallState(), false)
+	argMap, err := f.reachTarget(log, &g, vertexRoot, vertexF, newCallState(vertexI, convs), false)
 	if err != nil {
 		return resultError(err)
 	}
@@ -46,6 +46,7 @@ func (f *Func) callGraph(args *argBuilder) (
 	vertexRoot graph.Vertex,
 	vertexF graph.Vertex,
 	vertexI []graph.Vertex,
+	convs []*Func,
 	err error,
 ) {
 	log := args.logger
@@ -63,7 +64,6 @@ func (f *Func) callGraph(args *argBuilder) (
 
 	// Next, we add "inputs", which are the given named values that
 	// we already know about. These are tracked as "vertexI".
-	var convs []*Func
 	vertexI, convs = args.graph(log, &g, vertexRoot)
 
 	// Next, for all values we may have or produce, we need to create
@@ -272,6 +272,22 @@ func (f *Func) callGraph(args *argBuilder) (
 			g.Remove(v)
 		}
 	}
+
+	// Finally, run through all funcVertex vertices and remove any that
+	// do not have out edges for all inputs
+	for _, raw := range g.Vertices() {
+		v, ok := raw.(*funcVertex)
+		if !ok {
+			continue
+		}
+		outs := g.OutEdges(v)
+		if len(outs) == 1 && outs[0] == vertexRoot {
+			continue
+		}
+		if len(v.Func.Input().Values()) != len(g.OutEdges(v)) {
+			g.Remove(v)
+		}
+	}
 	log.Trace("graph after input DFS", "graph", g.String())
 
 	// Go through all our inputs. If any aren't in the graph any longer
@@ -373,15 +389,24 @@ func (f *Func) reachTarget(
 	// Waypoint usage it happens here.
 	var unsatisfied []*Value
 
+	// Start with creating a copy of our graph and removing the current target.
+	// This will allow us to resolve any extra required paths while ensuring
+	// the resolved path doesn't result in a cycle.
+	baseG := g.Copy()
+	baseG.Remove(target)
+
+	// Set our currentG to the baseG. The currentG may be replaced below if
+	// the graph needs to be re-weighted.
+	currentG := baseG
+
 	paths := make([][]graph.Vertex, len(vertexT))
 	for i, current := range vertexT {
-		currentG := g
-
 		// For value vertices, we discount any other values that share the
 		// same name. This lets our shortest paths prefer matching through
 		// same-named arguments.
 		if currentValue, ok := current.(*valueVertex); ok {
-			currentG = currentG.Copy()
+			// Copy in the base graph so we can re-weight based on name
+			currentG = baseG.Copy()
 			for _, raw := range currentG.Vertices() {
 				if v, ok := raw.(*valueVertex); ok && v.Name == currentValue.Name {
 					for _, src := range currentG.InEdges(raw) {
@@ -399,15 +424,33 @@ func (f *Func) reachTarget(
 		paths[i] = currentG.EdgeToPath(current, edgeTo)
 		log.Trace("path for target", "target", current, "path", paths[i])
 
-		// Get the input
-		input := paths[i][0]
-		if _, ok := input.(*rootVertex); ok && len(paths[i]) > 1 {
-			input = paths[i][1]
+		// The path that is generated should start with the defined root vertex and
+		// end with the current vertex. If the path does not, then the path itself
+		// is invalid and the current vertex is deemed unsatisfied
+		if paths[i][0] != root || paths[i][len(paths[i])-1] != current {
+			log.Trace("invalid path generated", "root", root, "target", target, "path", paths[i])
+
+			valueable, ok := current.(valueConverter)
+			if !ok {
+				// This shouldn't be possible
+				panic(fmt.Sprintf("argmapper graph node doesn't implement value(): %T", current))
+			}
+
+			unsatisfied = append(unsatisfied, valueable.value())
+			continue
 		}
 
-		// If the path contains ourself, then this target is unsatisfied.
-		for _, v := range paths[i] {
-			if v == target {
+		// Cycle through all vertices in the path. For any funcVertex vertices that
+		// are found, validate all their inputs can successfully reach the root vertex.
+		for _, raw := range paths[i] {
+			if _, ok := raw.(*funcVertex); !ok {
+				continue
+			}
+
+			if !f.rootReachable(log, currentG, root, raw) {
+				log.Trace("all inputs for function can not resolve to root",
+					"root", root, "func", raw, "path", paths[i])
+
 				valueable, ok := current.(valueConverter)
 				if !ok {
 					// This shouldn't be possible
@@ -415,7 +458,14 @@ func (f *Func) reachTarget(
 				}
 
 				unsatisfied = append(unsatisfied, valueable.value())
+				break
 			}
+		}
+
+		// Get the input
+		input := paths[i][0]
+		if _, ok := input.(*rootVertex); ok && len(paths[i]) > 1 {
+			input = paths[i][1]
 		}
 
 		// Store our input used
@@ -439,13 +489,22 @@ func (f *Func) reachTarget(
 
 	// If we have any unsatisfied values, error.
 	if len(unsatisfied) > 0 {
-		return nil, &ErrArgumentUnsatisfied{
-			Func: f,
-			Args: unsatisfied,
+		var inputs []*Value
+		for _, v := range state.inputs {
+			valueable, ok := v.(valueConverter)
+			if !ok {
+				// This shouldn't be possible
+				panic(fmt.Sprintf("argmapper graph node doesn't implement value(): %T", v))
+			}
 
-			// NOTE(mitchellh): This doesn't populate Inputs and Convs
-			// which is theoretically possible but a lot more difficult.
-			// Given this error is relatively rare, we can tackle this later.
+			inputs = append(inputs, valueable.value())
+		}
+
+		return nil, &ErrArgumentUnsatisfied{
+			Func:       f,
+			Args:       unsatisfied,
+			Inputs:     inputs,
+			Converters: state.converters,
 		}
 	}
 
@@ -556,6 +615,47 @@ func (f *Func) reachTarget(
 	return argMap, nil
 }
 
+func (f *Func) rootReachable(
+	log hclog.Logger,
+	g *graph.Graph,
+	root graph.Vertex,
+	target graph.Vertex,
+) bool {
+	outEdges := g.OutEdges(target)
+	if len(outEdges) < 2 {
+		return true
+	}
+
+	// Start with a copy that has our target vertex removed
+	g = g.Copy()
+	g.Remove(target)
+	// Calculate shortest path information with modifed graph
+	_, edgeTo := g.Reverse().Dijkstra(root)
+
+	// Now test all our edges to validate they can reach the root vertex
+	for _, v := range outEdges {
+		checkPath := g.EdgeToPath(v, edgeTo)
+		if checkPath[0] != root || checkPath[len(checkPath)-1] != v {
+			log.Trace("invalid path generated checking root reachability",
+				"root", root, "target", target, "path", checkPath)
+			return false
+		}
+		// Since other funcVertex vertices could be present in the checked
+		// path, locate them and validate they can properly reach the root
+		// vertex as well.
+		for _, cv := range checkPath {
+			if _, ok := cv.(*funcVertex); !ok {
+				continue
+			}
+			if !f.rootReachable(log, g, root, cv) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 // call -- the unexported version of Call -- calls the function directly
 // with the given named arguments. This skips the whole graph creation
 // step by requiring args satisfy all required arguments.
@@ -621,14 +721,26 @@ type callState struct {
 	// we can set the typedVertex values properly.
 	Value reflect.Value
 
+	// inputs holds the list of input vertices defined in the
+	// graph (used for error output)
+	inputs []graph.Vertex
+	// converts holds the list of converter functions defined
+	// (used for error output)
+	converters []*Func
+
 	// TODO
 	InputSet map[interface{}]graph.Vertex
 }
 
-func newCallState() *callState {
+func newCallState(
+	i []graph.Vertex, // list of input value vertices in graph
+	c []*Func, // list of converter funcs available
+) *callState {
 	return &callState{
 		NamedValue: map[string]reflect.Value{},
 		TypedValue: map[reflect.Type]reflect.Value{},
 		InputSet:   map[interface{}]graph.Vertex{},
+		inputs:     i,
+		converters: c,
 	}
 }
