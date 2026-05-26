@@ -132,7 +132,7 @@ func (f *Func) redefineInputs(opts ...Arg) (reflect.Type, error) {
 	log := builder.logger
 
 	// Get our call graph
-	g, vertexRoot, vertexF, vertexI, err := f.callGraph(builder)
+	g, vertexRoot, vertexF, vertexI, convs, err := f.callGraph(builder)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (f *Func) redefineInputs(opts ...Arg) (reflect.Type, error) {
 	// Build our call state and attempt to reach our target which is our
 	// function. This will recursively reach various conversion targets
 	// as necessary.
-	state := newCallState()
+	state := newCallState(vertexI, convs)
 	if _, err := f.reachTarget(log, &g, vertexRoot, vertexF, state, true); err != nil {
 		return nil, err
 	}
