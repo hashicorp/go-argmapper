@@ -204,7 +204,7 @@ func (g *Graph) String() string {
 		v := mapping[name]
 		targets := g.adjacencyOut[hashcode(v)]
 
-		fmt.Fprintf(buf, "%s\n", name)
+		fmt.Fprintf(&buf, "%s\n", name)
 
 		// Alphabetize dependencies
 		deps := make([]string, 0, len(targets))
@@ -216,7 +216,7 @@ func (g *Graph) String() string {
 
 		// Write dependencies
 		for _, d := range deps {
-			fmt.Fprintf(buf, "  %s\n", d)
+			fmt.Fprintf(&buf, "  %s\n", d)
 		}
 	}
 
