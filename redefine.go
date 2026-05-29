@@ -158,7 +158,7 @@ func (f *Func) redefineInputs(opts ...Arg) (reflect.Type, error) {
 	// function. This will recursively reach various conversion targets
 	// as necessary.
 	state := newCallState()
-	if _, err := f.reachTarget(log, &g, vertexRoot, vertexF, state, true); err != nil {
+	if _, err := f.reachTarget(log, &g, vertexRoot, vertexF, state, true, builder.dryRun); err != nil {
 		return nil, err
 	}
 
